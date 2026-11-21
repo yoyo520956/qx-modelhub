@@ -196,7 +196,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(j && typeof j.gwBase === 'string' && j.gwBase.indexOf('9999') > 0, '网关地址', j && j.gwBase);
 
   console.log('\n【6】网关：模型清单（不含已失败/未启用）');
-  r = await installQX(mkReq('/v1/models'), { file: GW });
+  r = await installQX(mkReq('/mh/v1/models'), { file: GW });
   j = jparse(r);
   ok(j && j.object === 'list' && j.data.length === 5, '5 个模型对外可见', j && j.data && j.data.map(x => x.id));
 
@@ -205,9 +205,9 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   let stObj = JSON.parse(store['modelhub.state.v1']);
   stObj.cfg.gwToken = 'sk-mh-secret';
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
-  r = await installQX(mkReq('/v1/models'), { file: GW });
+  r = await installQX(mkReq('/mh/v1/models'), { file: GW });
   ok(r.status.indexOf('401') > 0 || r.status.indexOf('403') > 0, '错误 Key 被拒', r.status);
-  r = await installQX({ url: 'http://127.0.0.1:9999/v1/models', path: '/v1/models', method: 'GET', headers: { Authorization: 'Bearer sk-mh-secret' } }, { file: GW });
+  r = await installQX({ url: 'http://127.0.0.1:9999/v1/models', path: '/mh/v1/models', method: 'GET', headers: { Authorization: 'Bearer sk-mh-secret' } }, { file: GW });
   ok(r.status.indexOf('200') > 0, '正确 Key 通过', r.status);
   // 复位 token，后续用例用无鉴权模式
   stObj = JSON.parse(store['modelhub.state.v1']); stObj.cfg.gwToken = '';
@@ -215,7 +215,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
 
   console.log('\n【8】网关：对话路由（选最快的 alpha）');
   upstreamCalls = [];
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', {
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', {
     model: 'alpha', messages: [{ role: 'user', content: '你好' }]
   }), { file: GW });
   j = jparse(r);
@@ -227,7 +227,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(sent && sent.stream === false, '上游请求 stream=false', sent && sent.stream);
 
   console.log('\n【9】网关：客户端乱填模型名也能用');
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', {
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', {
     model: 'gpt-4o-whatever', messages: [{ role: 'user', content: 'hi' }]
   }), { file: GW });
   j = jparse(r);
@@ -235,7 +235,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(j && j.model === 'gpt-4o-whatever', '响应里保留客户端请求的 model 名', j && j.model);
 
   console.log('\n【10】网关：流式请求合成 SSE');
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', {
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', {
     model: 'alpha', stream: true, messages: [{ role: 'user', content: 'hi' }]
   }), { file: GW });
   const ct = (r.headers || {})['Content-Type'] || (r.headers || {})['content-type'] || '';
@@ -253,7 +253,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   stObj.cfg.overrideModel = true;
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
   upstreamCalls = [];
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', {
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', {
     model: 'claude-x', messages: [
       { role: 'system', content: '你是助手' },
       { role: 'user', content: '你好' }
@@ -273,7 +273,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   stObj.models.forEach(m => { m.enabled = (m.name === 'gemini-pro'); });
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
   upstreamCalls = [];
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', {
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', {
     model: 'gemini-pro', messages: [{ role: 'user', content: '你好' }]
   }), { file: GW });
   j = jparse(r);
@@ -297,7 +297,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
 
   let sawFail = false;
   for (let i = 0; i < 3; i++) {
-    r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'hi' }] }), { file: GW });
+    r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'hi' }] }), { file: GW });
     const jj = jparse(r);
     if (!jj || !jj.choices) sawFail = true;
     if (i === 0) ok(!jj || !jj.choices || jj.error, '第一次打到了坏模型并失败', jj && (jj.error || jj.choices));
@@ -308,7 +308,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(dead.cooldown > Date.now(), '进入冷却期', { cooldown: dead.cooldown - Date.now() });
   ok(sawFail, '过程中确实出现过失败响应');
 
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'hi' }] }), { file: GW });
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'hi' }] }), { file: GW });
   j = jparse(r);
   ok(j && j.choices && j.choices[0].message.content.indexOf('alpha') > 0, '冷却后改走 alpha', j && j.choices && j.choices[0].message.content);
 
@@ -330,7 +330,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   stObj.models.forEach(m => { m.enabled = true; m.ok = true; m.lat = 100; m.p = 0; m.cooldown = 0; });
   stObj.models.find(m => m.name === 'claude-x').p = 10;
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'x' }] }), { file: GW });
+  r = await installQX(mkReq('/mh/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'x' }] }), { file: GW });
   j = jparse(r);
   ok(j && j.choices && j.choices[0].message.content.indexOf('Claude') > 0, 'priority 生效选中 claude-x', j && j.choices && j.choices[0].message.content);
 

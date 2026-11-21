@@ -481,7 +481,7 @@ var MH = (function () {
     try {
       var hd = $request.headers || {};
       var h = hd.Host || hd.host || hd[':authority'] || '';
-      if (h) return 'http://' + h;
+      if (h) return 'http://' + h + '/mh';
     } catch (e) { }
     return 'http://127.0.0.1:9999';
   }

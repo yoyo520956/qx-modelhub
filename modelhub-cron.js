@@ -1,6 +1,6 @@
 /*!
  * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:43
+ * 生成时间: 2026-11-22 02:52
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 逻辑 =====
@@ -487,7 +487,7 @@ var MH = (function () {
     try {
       var hd = $request.headers || {};
       var h = hd.Host || hd.host || hd[':authority'] || '';
-      if (h) return 'http://' + h;
+      if (h) return 'http://' + h + '/mh';
     } catch (e) { }
     return 'http://127.0.0.1:9999';
   }

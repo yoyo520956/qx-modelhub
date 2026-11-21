@@ -30,7 +30,7 @@ function MH_GW() {
   var rawPath = ($request.path || '/');
   var qi = rawPath.indexOf('?');
   var path = (qi >= 0 ? rawPath.slice(0, qi) : rawPath).replace(/\/+$/, '');
-  path = path.replace(/^\/v1(?=\/|$)/, '') || '/';
+  path = path.replace(/^\/mh\/v1(?=\/|$)/, '').replace(/^\/v1(?=\/|$)/, '') || '/';
   var method = ($request.method || 'GET').toUpperCase();
 
   var st = MH.load();

@@ -1,6 +1,6 @@
 /*!
  * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:43
+ * 生成时间: 2026-11-22 02:52
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 面板 UI（内联 HTML）=====
@@ -491,7 +491,7 @@ var MH = (function () {
     try {
       var hd = $request.headers || {};
       var h = hd.Host || hd.host || hd[':authority'] || '';
-      if (h) return 'http://' + h;
+      if (h) return 'http://' + h + '/mh';
     } catch (e) { }
     return 'http://127.0.0.1:9999';
   }
@@ -818,7 +818,7 @@ function MH_GW() {
   var rawPath = ($request.path || '/');
   var qi = rawPath.indexOf('?');
   var path = (qi >= 0 ? rawPath.slice(0, qi) : rawPath).replace(/\/+$/, '');
-  path = path.replace(/^\/v1(?=\/|$)/, '') || '/';
+  path = path.replace(/^\/mh\/v1(?=\/|$)/, '').replace(/^\/v1(?=\/|$)/, '') || '/';
   var method = ($request.method || 'GET').toUpperCase();
 
   var st = MH.load();
@@ -1169,6 +1169,6 @@ function MH_CRON() {
   var hasReq = (typeof $request !== 'undefined') && $request && $request.path;
   if (!hasReq) { return MH_CRON(); }
   var p = String($request.path || '');
-  if (/^\/v1(\/|$)/.test(p)) return MH_GW();
+  if (/^\/mh\/v1(\/|$)/.test(p) || /^\/v1(\/|$)/.test(p)) return MH_GW();
   return MH_PANEL();
 })();

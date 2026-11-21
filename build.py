@@ -57,7 +57,7 @@ dispatch = '''
   var hasReq = (typeof $request !== 'undefined') && $request && $request.path;
   if (!hasReq) { return MH_CRON(); }
   var p = String($request.path || '');
-  if (/^\\/v1(\\/|$)/.test(p)) return MH_GW();
+  if (/^\\/mh\\/v1(\\/|$)/.test(p) || /^\\/v1(\\/|$)/.test(p)) return MH_GW();
   return MH_PANEL();
 })();
 '''
