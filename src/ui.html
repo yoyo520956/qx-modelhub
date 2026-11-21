@@ -244,9 +244,18 @@ function toast(msg, kind){
 /* ============ API ============ */
 function api(path, body){
   if(MOCK) return mockApi(path, body);
-  var opt = {method: body?'POST':'GET', headers:{}};
-  if(body){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }
-  return fetch(API+path, opt).then(function(r){ return r.json(); })
+  var q = '';
+  if(body){
+    var parts = [];
+    for(var k in body){
+      var v = body[k];
+      if(v === undefined || v === null) continue;
+      if(Object.prototype.toString.call(v) === '[object Array]') v = v.join('|');
+      parts.push(encodeURIComponent(k)+'='+encodeURIComponent(v));
+    }
+    if(parts.length) q = '?' + parts.join('&');
+  }
+  return fetch(API+path+q, {method:'GET', cache:'no-store'}).then(function(r){ return r.json(); })
     .catch(function(e){ return {ok:false, err:'网络错误: '+e.message}; });
 }
 
@@ -399,20 +408,22 @@ var PRESETS = [
   {n:'自定义', t:'openai', b:''}
 ];
 
+var FORM = {name:'', base:'', key:'', type:'openai', preset:-1};
+
 function renderPv(){
   var html = '';
   html += '<div class="card" id="addCard">'
     + '<div class="card-h">添加提供商</div>'
     + '<div class="fg"><label class="f">预设</label><div class="presets" id="presets">';
   PRESETS.forEach(function(p,i){
-    html += '<span class="chip" data-i="'+i+'">'+h(p.n)+'</span>';
+    html += '<span class="chip'+(FORM.preset===i?' on':'')+'" data-i="'+i+'">'+h(p.n)+'</span>';
   });
   html += '</div></div>'
-    + '<div class="fg"><label class="f">名称</label><input type="text" id="fName" placeholder="例如 DeepSeek"></div>'
-    + '<div class="fg"><label class="f">Base URL</label><input type="text" id="fBase" placeholder="https://api.deepseek.com/v1" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'
-    + '<div class="fg"><label class="f">API Key</label><input type="password" id="fKey" placeholder="sk-..." autocapitalize="off" autocorrect="off" spellcheck="false"></div>'
-    + '<button class="btn pri" id="btnSave" style="width:100%;justify-content:center">保存并拉取模型</button>'
-    + '<div style="font-size:11.5px;color:var(--tx3);margin-top:9px;line-height:1.6">Key 只保存在本机 Quantumult X 的 $prefs 里，不上传任何服务器。Base URL 要填到版本号为止（如 <span class="mono">https://api.deepseek.com/v1</span>），拉取模型就是请求 {Base}/models。</div>'
+    + '<div class="fg"><label class="f">名称</label><input type="text" id="fName" value="'+h(FORM.name)+'" placeholder="例如 DeepSeek"></div>'
+    + '<div class="fg"><label class="f">Base URL</label><input type="text" id="fBase" value="'+h(FORM.base)+'" placeholder="https://api.deepseek.com/v1" autocapitalize="off" autocorrect="off" spellcheck="false"></div>'
+    + '<div class="fg"><label class="f">API Key</label><input type="password" id="fKey" value="'+h(FORM.key)+'" placeholder="sk-..." autocapitalize="off" autocorrect="off" spellcheck="false"></div>'
+    + '<button class="btn pri" id="btnSave" style="width:100%;justify-content:center">保存</button>'
+    + '<div style="font-size:11.5px;color:var(--tx3);margin-top:9px;line-height:1.6">保存后自动拉取模型列表。Base URL 要填到版本号为止，例如 <span class="mono">https://api.deepseek.com/v1</span></div>'
     + '</div>';
 
   var ps = S.providers||[];
@@ -437,32 +448,49 @@ function renderPv(){
   }
   $('#s-pv').innerHTML = html;
 
-  var cur = -1;
+  // 表单状态：输入即存，重渲染自动回填
+  function syncForm(){
+    var n=$('#fName'), b=$('#fBase'), k=$('#fKey');
+    if(n) FORM.name = n.value;
+    if(b) FORM.base = b.value;
+    if(k) FORM.key  = k.value;
+  }
+  ['fName','fBase','fKey'].forEach(function(id){
+    var el=$('#'+id); if(el) el.addEventListener('input', syncForm);
+  });
+
   $('#presets').addEventListener('click', function(e){
     var c = e.target.closest('.chip'); if(!c) return;
-    var i = +c.dataset.i, p = PRESETS[i];
+    var i = +c.dataset.i, pr = PRESETS[i];
     Array.prototype.forEach.call($('#presets').children, function(x){x.classList.remove('on')});
     c.classList.add('on');
-    $('#fBase').value = p.b; $('#fName').value = p.n==='自定义'?'':p.n;
-    cur = i;
-    if(p.n!=='自定义') $('#fKey').focus();
+    FORM.preset = i; FORM.type = pr.t;
+    if(pr.b){ FORM.base = pr.b; if($('#fBase')) $('#fBase').value = pr.b; }
+    if(pr.n !== '自定义'){
+      FORM.name = pr.n;
+      if($('#fName')) $('#fName').value = pr.n;
+      if($('#fKey')) $('#fKey').focus();
+    }
   });
+
   $('#btnSave').addEventListener('click', function(){
-    var name=$('#fName').value.trim(), base=$('#fBase').value.trim(), key=$('#fKey').value.trim();
+    syncForm();
+    var base = FORM.base.trim(), key = FORM.key.trim();
     if(!base){ toast('先填 Base URL'); return; }
     if(!key){ toast('先填 API Key'); return; }
-    var type = cur>=0 ? PRESETS[cur].t : 'openai';
-    var b = this; b.classList.add('busy'); b.disabled=true;
-    api('provider.add', {name:name||base, base:base, key:key, type:type}).then(function(d){
-      b.classList.remove('busy'); b.disabled=false;
-      if(!d.ok){ toast(d.err||'添加失败','err'); return; }
-      $('#fKey').value=''; $('#fName').value=''; $('#fBase').value='';
-      Array.prototype.forEach.call($('#presets').children, function(x){x.classList.remove('on')});
-      cur=-1;
-      if(d.warn){ toast(d.warn,'err'); }
-      else if(d.models && d.models.length){ openPicker(d.pid, d.discovered, d.models); }
-      else { toast('已保存，但这个接口没返回模型列表','ok'); }
+    var b = this; b.classList.add('busy'); b.disabled = true;
+    api('provider.add', {name: FORM.name.trim() || base, base: base, key: key, type: FORM.type}).then(function(d){
+      b.classList.remove('busy'); b.disabled = false;
+      if(!d.ok){ toast(d.err || '保存失败', 'err'); return; }
+      FORM.key = '';
+      toast('已保存，正在拉模型…', 'ok');
       load();
+      api('provider.sync', {id: d.pid}).then(function(s2){
+        if(!s2.ok){ toast('拉取失败：' + (s2.err || '未知') + '｜可在列表里点「拉取」重试', 'err'); load(); return; }
+        if(s2.discovered && s2.discovered.length) openPicker(d.pid, s2.discovered, s2.models || []);
+        else toast('接口没返回模型列表', 'err');
+        load();
+      });
     });
   });
 }

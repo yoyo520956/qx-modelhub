@@ -7,7 +7,7 @@ SRC = os.path.join(ROOT, 'src')
 OUT = os.path.join(ROOT, 'out')
 os.makedirs(OUT, exist_ok=True)
 
-VER = '1.2.0'
+VER = '1.2.1'
 
 def rd(n):
     with open(os.path.join(SRC, n), encoding='utf-8') as f:

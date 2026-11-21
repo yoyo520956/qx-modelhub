@@ -103,8 +103,11 @@ function installQX(request, opts) {
 }
 
 function mkReq(p, method, body, headers) {
+  const qi = p.indexOf('?');
   return {
-    url: ENTRY + p, path: p, method: method || 'GET',
+    url: ENTRY + p,
+    path: qi >= 0 ? p.slice(0, qi) : p,   // QX 的 $request.path 通常不含 query
+    method: method || 'GET',
     headers: Object.assign({ Host: 'mh.qx', Authorization: 'Bearer client-key' }, headers || {}),
     body: body === undefined ? undefined : (typeof body === 'string' ? body : JSON.stringify(body))
   };
@@ -130,16 +133,21 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   console.log('\n【1】面板：添加提供商 + 自动拉模型');
   r = await installQX(mkReq('/mh/api/provider.add', 'POST', { name: 'A', base: 'http://127.0.0.1:8811/v1', key: 'sk-a', type: 'openai' }), { file: F });
   j = jparse(r);
-  ok(j && j.ok && j.discovered.length === 3, '发现 3 个模型', j);
+  ok(j && j.ok && j.pid, '添加提供商（立即返回）', j);
   const pidA = j.pid;
+  r = await installQX(mkReq('/mh/api/provider.sync', 'POST', { id: pidA }), { file: F });
+  j = jparse(r);
+  ok(j && j.ok && j.discovered.length === 3, '拉取到 3 个模型', j && j.discovered);
 
   console.log('\n【2】anthropic / gemini');
   r = await installQX(mkReq('/mh/api/provider.add', 'POST', { name: 'B', base: 'http://127.0.0.1:8812/v1', key: 'sk-b', type: 'anthropic' }), { file: F });
+  j = jparse(r); const pidB = j.pid; ok(j && j.ok && j.pid, '添加 anthropic', j);
+  r = await installQX(mkReq('/mh/api/provider.sync', 'POST', { id: pidB }), { file: F });
   j = jparse(r); ok(j && j.discovered[0] === 'claude-x', 'anthropic 拉模型', j && j.discovered);
-  const pidB = j.pid;
   r = await installQX(mkReq('/mh/api/provider.add', 'POST', { name: 'G', base: 'http://127.0.0.1:8813/v1beta', key: 'g-key', type: 'gemini' }), { file: F });
+  j = jparse(r); const pidG = j.pid; ok(j && j.ok && j.pid, '添加 gemini', j);
+  r = await installQX(mkReq('/mh/api/provider.sync', 'POST', { id: pidG }), { file: F });
   j = jparse(r); ok(j && j.discovered.length === 1 && j.discovered[0] === 'gemini-pro', 'gemini 过滤 embedding', j && j.discovered);
-  const pidG = j.pid;
 
   console.log('\n【3】添加模型');
   r = await installQX(mkReq('/mh/api/model.add', 'POST', { pid: pidA, names: ['alpha', 'beta', 'gamma-dead'] }), { file: F });
@@ -233,6 +241,47 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   r = await installQX(mkReq('/mh/api/ping'), { file: F });
   j = jparse(r);
   ok(j && j.pong === 1 && j.v === '1.2.0', '诊断端点 /api/ping', j);
+
+  console.log('\n【15】面板实际路径：GET + query 参数');
+  store = {}; persist();
+  r = await installQX(mkReq('/mh/api/provider.add?name=GetA&base=' + encodeURIComponent('http://127.0.0.1:8811/v1') + '&key=sk-get&type=openai'), { file: F });
+  j = jparse(r);
+  ok(j && j.ok && j.pid, 'GET 添加提供商立即返回', j);
+  ok(j && !j.discovered, '同一请求里不再拉模型（避免超时）', j && j.discovered);
+  const pidGet = j.pid;
+
+  r = await installQX(mkReq('/mh/api/provider.sync?id=' + pidGet), { file: F });
+  j = jparse(r);
+  ok(j && j.ok && j.discovered.length === 3, 'GET 拉模型', j && j.discovered);
+
+  r = await installQX(mkReq('/mh/api/model.add?pid=' + pidGet + '&names=' + encodeURIComponent('alpha|beta|gamma-dead')), { file: F });
+  j = jparse(r);
+  ok(j && j.added === 3, 'GET 批量添加（| 分隔）', j);
+
+  r = await installQX(mkReq('/mh/api/model.patch?id=' + encodeURIComponent(pidGet + '::beta') + '&enabled=false'), { file: F });
+  j = jparse(r);
+  ok(j && j.ok, 'GET 关闭单个模型', j);
+
+  r = await installQX(mkReq('/mh/api/state'), { file: F });
+  j = jparse(r);
+  ok(j && j.providers.length === 1 && j.models.length === 3, 'GET 状态读回', j && { p: j.providers.length, m: j.models.length });
+  const betaM = (j.models || []).find(m => m.name === 'beta');
+  ok(betaM && betaM.enabled === false, '字符串 "false" 解析成布尔', betaM && betaM.enabled);
+
+  r = await installQX(mkReq('/mh/api/cfg.set?strategy=priority&checkMin=15&overrideModel=false'), { file: F });
+  r = await installQX(mkReq('/mh/api/state'), { file: F });
+  j = jparse(r);
+  ok(j && j.cfg.strategy === 'priority', 'GET 保存策略', j && j.cfg.strategy);
+  ok(j && j.cfg.checkMin === 15, '数字参数解析', j && j.cfg.checkMin);
+  ok(j && j.cfg.overrideModel === false, '布尔参数解析', j && j.cfg.overrideModel);
+
+  console.log('\n【16】诊断端点 diag');
+  r = await installQX(mkReq('/mh/api/diag'), { file: F });
+  j = jparse(r);
+  ok(j && j.has && j.has.prefs === true, 'diag: $prefs 可用', j && j.has);
+  ok(j && j.prefsTest && j.prefsTest.write && j.prefsTest.readBack, 'diag: 写入并回读成功', j && j.prefsTest);
+  ok(j && j.req && j.req.path === '/mh/api/diag', 'diag: 请求路径正确', j && j.req);
+  console.log('    diag 摘要: ' + JSON.stringify({ has: j && j.has, prefsTest: j && j.prefsTest, bodyType: j && j.req && j.req.bodyType, store: j && j.store }));
 
   console.log('\n' + '='.repeat(52));
   console.log('通过 ' + pass + ' / 失败 ' + failed);

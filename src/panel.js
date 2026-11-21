@@ -34,11 +34,33 @@ function MH_PANEL() {
     if (!answered) reply({ status: 'HTTP/1.1 504 Gateway Timeout', headers: H(), body: JSON.stringify({ ok: false, err: '脚本超时' }) });
   }, 120000);
 
-  var rawPath = ($request.path || '/');
+  function parseQS(qs) {
+    var out = {};
+    if (!qs) return out;
+    var parts = String(qs).split('&');
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      var eq = parts[i].indexOf('=');
+      var k = eq >= 0 ? parts[i].slice(0, eq) : parts[i];
+      var v = eq >= 0 ? parts[i].slice(eq + 1) : '';
+      try { k = decodeURIComponent(k); v = decodeURIComponent(v); } catch (e) { }
+      out[k] = v;
+    }
+    return out;
+  }
+
+  var fullUrl = String($request.url || '');
+  var uq = fullUrl.indexOf('?');
+  var query = uq >= 0 ? fullUrl.slice(uq + 1) : '';
+
+  var rawPath = String($request.path || '');
   var qi = rawPath.indexOf('?');
   var path = qi >= 0 ? rawPath.slice(0, qi) : rawPath;
-  var query = qi >= 0 ? rawPath.slice(qi + 1) : '';
-
+  if (!path) {
+    var se = fullUrl.indexOf('://');
+    var sl = se >= 0 ? fullUrl.indexOf('/', se + 3) : -1;
+    path = sl >= 0 ? fullUrl.slice(sl, uq >= 0 ? uq : undefined) : '/';
+  }
   try { path = decodeURIComponent(path); } catch (e) { }
 
   // 去掉 /mh 前缀（/mh、/mh/、/mh/xxx 都兼容）
@@ -49,9 +71,36 @@ function MH_PANEL() {
     return reply({ status: 'HTTP/1.1 204 No Content', headers: H(), body: '' });
   }
 
-  // 诊断用：能拿到 pong 说明脚本已被 QX 正常加载
+  // 诊断：一眼看出 $prefs 能不能写、$request 里有什么
+  if (rel === '/api/diag') {
+    var probeVal = 'p' + MH.now();
+    var wrote = false, got = null;
+    try { wrote = !!$prefs.setValueForKey(probeVal, 'modelhub.diag'); } catch (e) { }
+    try { got = $prefs.valueForKey('modelhub.diag'); } catch (e) { }
+    var st0 = MH.load();
+    return json({
+      ok: true, v: MH_VER_,
+      has: {
+        prefs: typeof $prefs !== 'undefined',
+        task: typeof $task !== 'undefined',
+        notify: typeof $notify !== 'undefined',
+        response: typeof $response !== 'undefined'
+      },
+      req: {
+        url: fullUrl.slice(0, 140), path: path, method: $request.method,
+        bodyType: typeof $request.body,
+        bodyLen: String($request.body || '').length,
+        headerKeys: Object.keys($request.headers || {}).slice(0, 14)
+      },
+      queryLen: query.length, queryKeys: Object.keys(parseQS(query)),
+      prefsTest: { write: wrote, readBack: got === probeVal },
+      store: { providers: (st0.providers || []).length, models: (st0.models || []).length },
+      now: MH.now()
+    });
+  }
+
   if (rel === '/api/ping') {
-    return json({ ok: true, pong: 1, name: 'ModelHub', v: MH_VER_, path: path, at: MH.now() });
+    return json({ ok: true, pong: 1, name: 'ModelHub', v: MH_VER_, at: MH.now() });
   }
 
   // 非 API 路径一律返回面板，避免 404 让人误判
@@ -60,8 +109,26 @@ function MH_PANEL() {
   }
 
   var action = rel.slice(5);
-  var body = {};
-  try { body = MH.reqJson($request.body) || {}; } catch (e) { body = {}; }
+
+  // 参数优先从 query 取（echo-response 下 body 不一定可用），再用 body 覆盖
+  var params = parseQS(query);
+  var bodyJson = null;
+  try { bodyJson = MH.reqJson($request.body); } catch (e) { }
+  if (bodyJson && typeof bodyJson === 'object') {
+    for (var bk in bodyJson) params[bk] = bodyJson[bk];
+  }
+
+  function arr(v) {
+    if (v === undefined || v === null) return [];
+    if (Object.prototype.toString.call(v) === '[object Array]') return v;
+    var t = String(v);
+    if (!t) return [];
+    return t.indexOf('|') >= 0 ? t.split('|') : t.split(',');
+  }
+  function bool(v) {
+    if (typeof v === 'boolean') return v;
+    return v === 'true' || v === '1' || v === 1;
+  }
 
   var st = MH.load();
 
@@ -85,64 +152,50 @@ function MH_PANEL() {
 
   /* ---------------- 提供商 ---------------- */
   if (action === 'provider.add') {
-    var base = MH.trimBase(body.base)
+    var base = MH.trimBase(params.base)
       .replace(/\/(chat\/completions|completions|models|messages)$/i, '')
       .replace(/\/+$/, '');
-    var key = String(body.key || '').trim();
+    var key = String(params.key || '').trim();
     if (!base || !key) return fail('Base URL 和 Key 都不能为空');
     if (!/^https?:\/\//.test(base)) return fail('Base URL 需要以 http:// 或 https:// 开头');
 
     var p = {
       id: MH.uid('p_'),
-      name: String(body.name || '').trim() || base.replace(/^https?:\/\//, '').split('/')[0],
-      type: body.type || 'openai',
+      name: String(params.name || '').trim() || base.replace(/^https?:\/\//, '').split('/')[0],
+      type: params.type || 'openai',
       base: base, key: key,
       ok: null, lastErr: '', lastSync: 0, added: MH.now()
     };
     st.providers.push(p);
     MH.log(st, '[provider] 添加 ' + p.name + ' (' + p.base + ')');
-    MH.save(st);
-
-    return MH.discover(p, function (err, list) {
-      var st2 = MH.load();
-      var p2 = MH.pOf(st2, p.id) || p;
-      if (err) {
-        p2.ok = false; p2.lastErr = err; p2.lastSync = MH.now();
-        MH.log(st2, '[provider] ' + p2.name + ' 拉取失败: ' + err);
-        MH.save(st2);
-        return json({ ok: true, pid: p.id, discovered: [], models: [], warn: '已保存，但拉取模型失败：' + err });
-      }
-      p2.ok = true; p2.lastErr = ''; p2.lastSync = MH.now();
-      MH.log(st2, '[provider] ' + p2.name + ' 发现 ' + list.length + ' 个模型');
-      MH.save(st2);
-      var have = [];
-      for (var i = 0; i < st2.models.length; i++) if (st2.models[i].pid === p.id) have.push(st2.models[i].name);
-      json({ ok: true, pid: p.id, discovered: list, models: have });
-    });
+    var saved = MH.save(st);
+    if (!saved) return fail('写入失败：$prefs 不可用（面板无法保存配置）');
+    // 立即返回，模型列表由前端再调 provider.sync 拉取
+    return json({ ok: true, pid: p.id, saved: true });
   }
 
   if (action === 'provider.sync') {
-    var p3 = MH.pOf(st, body.id);
+    var p3 = MH.pOf(st, params.id);
     if (!p3) return fail('提供商不存在');
     return MH.discover(p3, function (err, list) {
       var st2 = MH.load();
-      var p4 = MH.pOf(st2, body.id);
+      var p4 = MH.pOf(st2, params.id);
       if (p4) { p4.ok = !err; p4.lastErr = err || ''; p4.lastSync = MH.now(); }
       if (err) {
-        MH.log(st2, '[provider] ' + body.id + ' 同步失败: ' + err);
+        MH.log(st2, '[provider] ' + params.id + ' 同步失败: ' + err);
         MH.save(st2);
         return json({ ok: false, err: err });
       }
       MH.log(st2, '[provider] ' + p4.name + ' 同步到 ' + list.length + ' 个模型');
       MH.save(st2);
       var have = [];
-      for (var i = 0; i < st2.models.length; i++) if (st2.models[i].pid === body.id) have.push(st2.models[i].name);
+      for (var i = 0; i < st2.models.length; i++) if (st2.models[i].pid === params.id) have.push(st2.models[i].name);
       json({ ok: true, discovered: list, models: have });
     });
   }
 
   if (action === 'provider.del') {
-    var pid = body.id;
+    var pid = params.id;
     st.providers = st.providers.filter(function (x) { return x.id !== pid; });
     var before = st.models.length;
     st.models = st.models.filter(function (m) { return m.pid !== pid; });
@@ -153,7 +206,7 @@ function MH_PANEL() {
 
   /* ---------------- 模型 ---------------- */
   if (action === 'model.add') {
-    var pid2 = body.pid, names = body.names || [];
+    var pid2 = params.pid, names = arr(params.names);
     var pr = MH.pOf(st, pid2);
     if (!pr) return fail('提供商不存在');
     var added = 0;
@@ -177,16 +230,16 @@ function MH_PANEL() {
   }
 
   if (action === 'model.patch') {
-    var ids = body.ids && body.ids.length ? body.ids : (body.id ? [body.id] : []);
+    var ids = arr(params.ids); if (!ids.length && params.id) ids = [params.id];
     var n = 0;
     for (var i = 0; i < st.models.length; i++) {
       var m = st.models[i];
       if (ids.length && ids.indexOf(m.id) < 0) continue;
-      if (body.enabled !== undefined) m.enabled = !!body.enabled;
-      if (body.alias !== undefined) m.alias = String(body.alias || '').trim();
-      if (body.w !== undefined) m.w = Math.max(1, parseInt(body.w) || 1);
-      if (body.p !== undefined) m.p = parseInt(body.p) || 0;
-      if (body.reset) { m.ok = null; m.err = ''; m.fails = 0; m.cooldown = 0; m.lat = 0; m.checkedAt = 0; }
+      if (params.enabled !== undefined) m.enabled = bool(params.enabled);
+      if (params.alias !== undefined) m.alias = String(params.alias || '').trim();
+      if (params.w !== undefined) m.w = Math.max(1, parseInt(params.w) || 1);
+      if (params.p !== undefined) m.p = parseInt(params.p) || 0;
+      if (bool(params.reset)) { m.ok = null; m.err = ''; m.fails = 0; m.cooldown = 0; m.lat = 0; m.checkedAt = 0; }
       n++;
     }
     MH.save(st);
@@ -194,7 +247,7 @@ function MH_PANEL() {
   }
 
   if (action === 'model.del') {
-    var ids2 = body.ids || (body.id ? [body.id] : []);
+    var ids2 = arr(params.ids); if (!ids2.length && params.id) ids2 = [params.id];
     var b4 = st.models.length;
     st.models = st.models.filter(function (m) { return ids2.indexOf(m.id) < 0; });
     MH.log(st, '[model] 删除 ' + (b4 - st.models.length) + ' 个模型');
@@ -207,8 +260,10 @@ function MH_PANEL() {
     var allow = ['strategy', 'staleMin', 'checkMin', 'gwToken', 'timeoutMs', 'overrideModel', 'slidingCheck', 'checkMode'];
     for (var i = 0; i < allow.length; i++) {
       var k = allow[i];
-      if (body[k] !== undefined) st.cfg[k] = body[k];
+      if (params[k] !== undefined) st.cfg[k] = params[k];
     }
+    st.cfg.overrideModel = bool(st.cfg.overrideModel);
+    st.cfg.slidingCheck = bool(st.cfg.slidingCheck);
     st.cfg.staleMin = Math.max(1, parseInt(st.cfg.staleMin) || 5);
     st.cfg.checkMin = Math.max(1, parseInt(st.cfg.checkMin) || 10);
     st.cfg.timeoutMs = Math.max(5000, parseInt(st.cfg.timeoutMs) || 60000);
@@ -219,7 +274,7 @@ function MH_PANEL() {
 
   /* ---------------- 探测 ---------------- */
   if (action === 'check') {
-    var only = body.ids && body.ids.length ? body.ids : null;
+    var only = params.ids && params.ids.length ? params.ids : null;
     var list = [];
     for (var i = 0; i < st.models.length; i++) {
       var m = st.models[i];
