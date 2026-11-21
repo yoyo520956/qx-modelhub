@@ -1,9 +1,10 @@
 /*!
- * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:52
+ * ModelHub v1.2.0 — Quantumult X 本地模型路由（rewrite 架构，不需要本地服务器）
+ * 生成时间: 2026-11-22 03:02
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
-// ===== 逻辑 =====
+var MH_VER_ = "1.2.0";
+// ===== 公共逻辑 =====
 /* ==========================================================================
  * ModelHub core —— 共享逻辑（被 panel / gateway / cron 三端复用）
  * 运行环境：Quantumult X 脚本引擎（JavaScriptCore）
@@ -483,13 +484,12 @@ var MH = (function () {
   }
 
   function gwBase() {
-    // 从请求 Host 推导，用户改了 QX 端口也不会错
     try {
-      var hd = $request.headers || {};
-      var h = hd.Host || hd.host || hd[':authority'] || '';
-      if (h) return 'http://' + h + '/mh';
+      var u = String($request.url || '');
+      var m = /^(https?:\/\/[^\/]+)/.exec(u);
+      if (m) return m[1] + '/v1';
     } catch (e) { }
-    return 'http://127.0.0.1:9999';
+    return 'https://mh.qx/v1';
   }
 
   return {
@@ -507,6 +507,7 @@ var MH = (function () {
 })();
 
 
+// ===== 网关 =====
 /* ==========================================================================
  * ModelHub gateway —— OpenAI 兼容网关
  * 路径前缀 /v1/  →  http://127.0.0.1:9999/v1

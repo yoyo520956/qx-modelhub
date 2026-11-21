@@ -275,7 +275,7 @@ function render(){
 /* ---------- 概览 ---------- */
 function renderOv(){
   var st=S.stats||{}, cfg=S.cfg||{};
-  var gw = (S.gwBase||'') + '/v1';
+  var gw = (S.gwBase||'');
   var html = '';
   html += '<div class="gw">'
     + '<div class="lbl">网关地址 · OpenAI 兼容接口</div>'
@@ -369,7 +369,7 @@ function resetUsage(){
 function stratName(s){
   return {latency:'最快可用', priority:'优先级', weight:'权重随机', rr:'轮询'}[s] || '最快可用';
 }
-function copyGw(){ copyText((S.gwBase||'')+'/v1'); }
+function copyGw(){ copyText((S.gwBase||'')); }
 function copyKey(){ copyText((S.cfg&&S.cfg.gwToken)||''); }
 function copyText(t){
   if(!t){ toast('没有内容可复制'); return; }

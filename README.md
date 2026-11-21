@@ -1,8 +1,10 @@
 # ModelHub · Quantumult X 本地 LLM 模型路由
 
-把 **Quantumult X 变成一个本地 LLM 网关**。手机上开一个网页，填 API Key，自动拉模型列表，点选加入池子；之后任意 OpenAI 兼容客户端只连一个地址，路由自动挑当前最快、还活着的那个模型，换 Base URL、换 Key、转协议，全在本地完成。
+把 **Quantumult X 变成一个本地 LLM 路由**。手机上开一个网页，填 API Key，自动拉模型列表，点选加入池子；之后任意 OpenAI 兼容客户端只连一个地址，路由自动挑当前最快、还活着的通道，换 Base URL、换 Key 全在本地完成。
 
 不需要服务器、不需要 Docker、不需要电脑。**没有一行代码跑在云端。**
+
+> **v1.2.0 换了架构**：不再依赖 `http_backend`（实测在部分设备上 9999 端口起不来），改为纯 `rewrite` 实现——面板用 `script-echo-response` 本地应答，路由用 `script-request-header` 改写 upstream。副作用是好的：**流式是真的了**，QX 按改写后的地址原生转发，不是攒完再吐。
 
 ---
 
@@ -26,80 +28,32 @@ ModelHub 是把同样的核心能力塞进 **QX 的 `[http_backend]`**——那�
 
 ## 装
 
-### 1. 放脚本
-
-只需要**一个文件** `modelhub.js`——面板、网关、定时探活都在里面，脚本按请求路径自动分发。
-
-**方式 A（推荐，完全不联网）**：把 `modelhub.js` 放进
-「iCloud Drive → Quantumult X → Scripts」
-或「我的 iPhone → Quantumult X → Scripts」
-
-**方式 B**：直接用本仓库的 raw / jsDelivr 地址（能自动更新，但依赖网络可达）。
-
-### 2. 加配置
-
-把 [`QX-modelhub.conf`](QX-modelhub.conf) 粘进 QX 配置文件，或新建 `ModelHub.conf` 导入。核心就两行：
+### 1. 三段配置
 
 ```ini
-[http_backend]
-https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js, tag=ModelHub, path=^/(mh|v1), enabled=true
+[rewrite_local]
+^https?://example\.com/mh url script-echo-response https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js
+^https?://example\.com/v1/models url script-echo-response https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js
+^https?://example\.com/v1/ url script-request-header https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js
 
 [task_local]
 */10 * * * * https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js, tag=ModelHub-Cron, enabled=true
+
+[mitm]
+hostname = example.com
 ```
 
-用方式 A（本地文件）的话，把 URL 换成裸文件名 `modelhub.js`。
+`example.com` 是 IANA 保留的文档域名，全球有 A 记录。QX 在 MITM 阶段就把它拦下来本地应答，请求不会真的发出去——所以不用改 DNS、不用开端口。
 
-> 也可以一键导入：点 `deeplink-raw.txt` 里那条 `quantumult-x:///...` 链接，QX 会自动添加这两个资源。`deeplink-jsdelivr.txt` 是 CDN 版。
+想换入口域名：三条 rewrite 和 mitm hostname 一起改。
 
-### 3. 打开面板
+### 2. 证书
 
-确保 QX 已开启，然后 Safari 打开：
+`[mitm]` 里加了 `example.com`，QX 需要解密这条连接。去广告用过 MITM 的话根证书已经在信任链里了；如果 Safari 打开面板报证书错误，去 QX「设置 → MitM」重新生成并安装一次根证书，然后在系统「设置 → 通用 → 关于本机 → 证书信任设置」里信任。
 
-```
-http://127.0.0.1:9999/mh/
-```
+### 3. 最稳：脚本放本地
 
-> 端口以 QX「设置 → 其他设置 → HTTP 服务端口」为准，默认 9999。
-
----
-
-### 4. 打不开？先做这个 30 秒自检
-
-Safari 打开：
-
-```
-http://127.0.0.1:9999/mh/api/ping
-```
-
-| 看到什么 | 说明 | 下一步 |
-|---|---|---|
-| `{"ok":true,"pong":1,"name":"ModelHub","v":"1.1.0",...}` | **脚本已加载成功** | 换成 `/mh/` 就是面板；若显示空白，下拉刷新 |
-| QX 自己的 404 / 空白页 / 连不上 | 脚本没被加载 | 看下面三条 |
-
-三条排查，按顺序：
-
-1. **端口对不对**。QX「设置 → 其他设置」里看 HTTP 服务端口，不是 9999 就把地址里的端口换掉。
-2. **脚本下载成功没有**。QX→「工具」→ 资源，找到 `ModelHub-Panel`，看状态。红色/失败 = 下载不到。
-   - 点它手动更新一次
-   - 还失败就换成 jsDelivr（本仓库 `QX-modelhub.conf` 里 B 组已备好）
-   - 再不行就用本地文件（下面 C 组）
-3. **配置真的生效了没有**。改完配置要在 QX 里重新载入（关掉再开一次 QX 隧道），不是改完文件就自动生效。
-
-### 5. 最稳的装法：本地文件（完全不联网）
-
-1. 下载 `modelhub.js` → 放进「iCloud Drive → Quantumult X → Scripts」
-2. 配置里用裸文件名（官方 sample 确认支持这种写法）：
-
-```ini
-[http_backend]
-modelhub.js, tag=ModelHub, path=^/(mh|v1), enabled=true
-
-[task_local]
-*/10 * * * * modelhub.js, tag=ModelHub-Cron, enabled=true
-```
-
-这条路一劳永逸：不依赖任何 CDN，QX 更新脚本也不需要重新下载。
+把 `modelhub.js` 放进「iCloud Drive → Quantumult X → Scripts」，三条 rewrite 和 task 里的 URL 换成裸文件名 `modelhub.js`。不联网、不依赖 CDN、不受 QX 资源缓存影响。
 
 ---
 
@@ -162,10 +116,9 @@ API Key : 面板「路由」页里那个网关 Key
 
 ## 已知限制（重要，别踩）
 
-1. **没有真流式。**
-   QX 脚本的 `$task.fetch` 只能拿到完整文本 body，拿不到边生成边返回的流。
-   所以客户端勾了 `stream: true` 时，网关会等上游全部生成完，再合成一段合法 SSE 发回去——客户端能正常解析、不会报错，但**不是逐字蹦出来的**，而是等几秒后整段出现。
-   这是 QX 的脚本 API 限制，不是实现偷懒。
+1. **流式只在 OpenAI 兼容通道上有。**
+   路由走 `script-request-header` 改写地址，QX 原生转发，所以 `stream: true` 是真的逐字返回。
+   但 Anthropic / Gemini 的响应格式不是 OpenAI 格式，`request-header` 阶段没地方做转换，所以这两类通道不参与路由，也不会出现在客户端的 `/v1/models` 里（面板里照样能管理、探活）。
 
 2. **上游必须是非流式。**
    网关永远用 `stream:false` 请求上游，避免上游长连接挂住导致超时。

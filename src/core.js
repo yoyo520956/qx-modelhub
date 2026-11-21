@@ -477,13 +477,12 @@ var MH = (function () {
   }
 
   function gwBase() {
-    // 从请求 Host 推导，用户改了 QX 端口也不会错
     try {
-      var hd = $request.headers || {};
-      var h = hd.Host || hd.host || hd[':authority'] || '';
-      if (h) return 'http://' + h + '/mh';
+      var u = String($request.url || '');
+      var m = /^(https?:\/\/[^\/]+)/.exec(u);
+      if (m) return m[1] + '/v1';
     } catch (e) { }
-    return 'http://127.0.0.1:9999';
+    return 'https://mh.qx/v1';
   }
 
   return {
