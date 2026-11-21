@@ -41,17 +41,22 @@
 
   try { path = decodeURIComponent(path); } catch (e) { }
 
-  // 去掉前缀
-  var rel = path.replace(/^\/mh/, '');
-  if (rel === '' || rel === '/' || rel === '/index.html') {
-    return html(MH_HTML_);
-  }
+  // 去掉 /mh 前缀（/mh、/mh/、/mh/xxx 都兼容）
+  var rel = path.replace(/^\/mh(?=\/|$)/, '');
+  if (rel === '') rel = '/';
+
   if (rel === '/favicon.ico') {
     return reply({ status: 'HTTP/1.1 204 No Content', headers: H(), body: '' });
   }
 
+  // 诊断用：能拿到 pong 说明脚本已被 QX 正常加载
+  if (rel === '/api/ping') {
+    return json({ ok: true, pong: 1, name: 'ModelHub', v: MH_VER_, path: path, at: MH.now() });
+  }
+
+  // 非 API 路径一律返回面板，避免 404 让人误判
   if (rel.indexOf('/api/') !== 0) {
-    return fail('未知路径 ' + rel);
+    return html(MH_HTML_);
   }
 
   var action = rel.slice(5);
@@ -67,6 +72,13 @@
 
   if (action === 'log.clear') {
     st.logs = [];
+    MH.save(st);
+    return json({ ok: true });
+  }
+
+  if (action === 'usage.reset') {
+    st.usage = { days: {}, models: {}, total: { p: 0, c: 0, t: 0, n: 0 } };
+    MH.log(st, '[usage] 用量统计已清零');
     MH.save(st);
     return json({ ok: true });
   }

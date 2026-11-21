@@ -67,6 +67,47 @@ http://127.0.0.1:9999/mh/
 
 ---
 
+### 4. 打不开？先做这个 30 秒自检
+
+Safari 打开：
+
+```
+http://127.0.0.1:9999/mh/api/ping
+```
+
+| 看到什么 | 说明 | 下一步 |
+|---|---|---|
+| `{"ok":true,"pong":1,"name":"ModelHub","v":"1.1.0",...}` | **脚本已加载成功** | 换成 `/mh/` 就是面板；若显示空白，下拉刷新 |
+| QX 自己的 404 / 空白页 / 连不上 | 脚本没被加载 | 看下面三条 |
+
+三条排查，按顺序：
+
+1. **端口对不对**。QX「设置 → 其他设置」里看 HTTP 服务端口，不是 9999 就把地址里的端口换掉。
+2. **脚本下载成功没有**。QX→「工具」→ 资源，找到 `ModelHub-Panel`，看状态。红色/失败 = 下载不到。
+   - 点它手动更新一次
+   - 还失败就换成 jsDelivr（本仓库 `QX-modelhub.conf` 里 B 组已备好）
+   - 再不行就用本地文件（下面 C 组）
+3. **配置真的生效了没有**。改完配置要在 QX 里重新载入（关掉再开一次 QX 隧道），不是改完文件就自动生效。
+
+### 5. 最稳的装法：本地文件（完全不联网）
+
+1. 下载三个文件 → 放进「iCloud Drive → Quantumult X → Scripts」
+   - `modelhub.js`、`modelhub-gw.js`、`modelhub-cron.js`
+2. 配置里用裸文件名（官方 sample 确认支持这种写法）：
+
+```ini
+[http_backend]
+modelhub.js, tag=ModelHub-Panel, path=^/mh/, enabled=true
+modelhub-gw.js, tag=ModelHub-GW, path=^/v1/, enabled=true
+
+[task_local]
+*/10 * * * * modelhub-cron.js, tag=ModelHub-Cron, enabled=true
+```
+
+这条路一劳永逸：不依赖任何 CDN，QX 更新脚本也不需要重新下载。
+
+---
+
 ## 用
 
 **添加模型**：`提供商` 页 → 点一个预设（OpenAI / DeepSeek / Kimi / 智谱 / 通义 / 硅基流动 / OpenRouter / Groq / Gemini / Anthropic）→ 填 Key → `保存并拉取模型`。会自动请求 `{Base}/models`，把返回的模型列出来让你勾选。
@@ -155,7 +196,7 @@ API Key : 面板「路由」页里那个网关 Key
 
 | 现象 | 原因 | 处理 |
 |---|---|---|
-| 打开面板 404 | 脚本没加载成功 | 检查 `[http_backend]` 那三行、脚本路径、QX 是否重启过 |
+| 面板打不开 | 脚本没加载 / 端口不对 | 先打 `/mh/api/ping`，按上面「30 秒自检」走 |
 | 面板能开但一直 0 个模型 | Cron 没跑 / 没点检测 | 点顶部「检测」，或检查 `[task_local]` |
 | 拉模型报 401 | Key 错 / 账号没权限 | 用 `provider` 的「拉取」重试，看面板上的错误文案 |
 | 拉模型报 404 | Base URL 少了版本段 | 改成 `.../v1` 这种形式 |

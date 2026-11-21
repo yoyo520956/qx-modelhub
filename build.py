@@ -17,6 +17,7 @@ panel = rd('panel.js')
 gw = rd('gateway.js')
 cron = rd('cron.js')
 
+VER = '1.1.0'
 BANNER = """/*!
  * ModelHub — Quantumult X 本地模型路由
  * 生成时间: %s
@@ -30,6 +31,7 @@ ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
 # ---------- 1. 面板 ----------
 panel_out = BANNER % ts + \
     "// ===== 面板 UI（内联 HTML）=====\n" \
+    "var MH_VER_ = " + json.dumps(VER) + ";\n" \
     "var MH_HTML_ = " + json.dumps(ui, ensure_ascii=False) + ";\n\n" \
     "// ===== 逻辑 =====\n" + core + "\n\n" + panel
 

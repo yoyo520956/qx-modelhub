@@ -1,6 +1,6 @@
 /*!
  * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:20
+ * 生成时间: 2026-11-22 02:28
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 逻辑 =====
@@ -25,6 +25,7 @@ var MH = (function () {
         gwToken: '', timeoutMs: 60000, overrideModel: true, slidingCheck: false,
         checkMode: 'ping'
       },
+      usage: null,
       logs: []
     };
   }
@@ -40,6 +41,7 @@ var MH = (function () {
     var c = o.cfg || {};
     for (var k in d.cfg) if (c[k] === undefined) c[k] = d.cfg[k];
     o.cfg = c;
+    if (!o.usage || !o.usage.days) o.usage = { days: {}, models: {}, total: { p: 0, c: 0, t: 0, n: 0 } };
     return o;
   }
 
@@ -274,6 +276,71 @@ var MH = (function () {
     }
   }
 
+  /* ---------- Token 用量统计 ---------- */
+  function zero() { return { p: 0, c: 0, t: 0, n: 0 }; }
+
+  function dayKey(t) {
+    var d = new Date(t === undefined ? now() : t);
+    var m = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd);
+  }
+
+  function addU(a, b) {
+    a.p += b.p || 0; a.c += b.c || 0; a.t += b.t || 0; a.n += b.n || 0;
+    return a;
+  }
+
+  // 一次请求记一笔
+  function recordUsage(st, mid, u) {
+    if (!st.usage || !st.usage.days) st.usage = { days: {}, models: {}, total: zero() };
+    u = u || {};
+    var p = u.prompt_tokens || 0, c = u.completion_tokens || 0;
+    var t = u.total_tokens || (p + c);
+    if (!p && !c && !t) return false;
+    var rec = { p: p, c: c, t: t, n: 1 };
+    var k = dayKey();
+    st.usage.days[k] = addU(st.usage.days[k] || zero(), rec);
+    if (mid) st.usage.models[mid] = addU(st.usage.models[mid] || zero(), rec);
+    st.usage.total = addU(st.usage.total || zero(), rec);
+    // 只留最近 120 天
+    var keys = Object.keys(st.usage.days).sort();
+    while (keys.length > 120) delete st.usage.days[keys.shift()];
+    return true;
+  }
+
+  function sumDays(st, n) {
+    var out = zero(), days = (st.usage && st.usage.days) || {};
+    for (var i = 0; i < n; i++) {
+      var d = days[dayKey(now() - i * 86400000)];
+      if (d) addU(out, d);
+    }
+    return out;
+  }
+
+  function usageStats(st) {
+    var u = st.usage || { days: {}, models: {}, total: zero() };
+    var byDay = [];
+    for (var i = 13; i >= 0; i--) {
+      var k = dayKey(now() - i * 86400000);
+      var d = u.days[k] || zero();
+      byDay.push({ d: k.slice(5), t: d.t, n: d.n });
+    }
+    var tops = [];
+    for (var id in (u.models || {})) {
+      var mm = u.models[id];
+      tops.push({ id: id, name: id.indexOf('::') >= 0 ? id.split('::')[1] : id, t: mm.t, n: mm.n });
+    }
+    tops.sort(function (a, b) { return b.t - a.t; });
+    return {
+      today: u.days[dayKey()] || zero(),
+      week: sumDays(st, 7),
+      month: sumDays(st, 30),
+      total: u.total || zero(),
+      byDay: byDay,
+      tops: tops.slice(0, 6)
+    };
+  }
+
   /* ---------- 路由：纯内存计算，零网络 ---------- */
   // 排序用延迟：失败的最差；未测量的视为"未知"，排在已测量之后但优于失败
   function latOf(m) {
@@ -409,6 +476,7 @@ var MH = (function () {
           hits: m.hits || 0, fails: m.fails || 0, w: m.w || 1, p: m.p || 0
         };
       }),
+      usage: usageStats(st),
       logs: st.logs || [],
       now: t
     };
@@ -431,6 +499,7 @@ var MH = (function () {
     authHeaders: authHeaders, bodyChat: bodyChat, reqJson: reqJson, fromB64: fromB64,
     parseModels: parseModels, extractText: extractText, errText: errText,
     discover: discover, probe: probe, applyProbe: applyProbe,
+    recordUsage: recordUsage, usageStats: usageStats, dayKey: dayKey,
     rank: rank, candidates: candidates, pick: pick, isStale: isStale,
     publicName: publicName, enabledModels: enabledModels, stats: stats,
     view: view, gwBase: gwBase
@@ -548,13 +617,23 @@ var MH = (function () {
         return oaiErr(MH.errText(r.statusCode, r.body), r.statusCode, 'upstream_error');
       }
 
+      var payload = toOpenAI(p0, r.body, outModel, useName);
+      if (!payload) {
+        if (m2) MH.applyProbe(st2, m2, '上游返回无法解析', lat);
+        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 返回无法解析');
+        bump(st2, m2);
+        MH.save(st2);
+        return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
+      }
+
+      // 记一笔 token 用量
+      var tk = (payload.usage && payload.usage.total_tokens) || 0;
+      MH.recordUsage(st2, first.id, payload.usage || {});
+
       if (m2) { m2.ok = true; m2.err = ''; m2.fails = 0; m2.cooldown = 0; m2.lat = lat; m2.checkedAt = MH.now(); }
-      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms');
+      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms · ' + tk + 'tk');
       bump(st2, m2);
       MH.save(st2);
-
-      var payload = toOpenAI(p0, r.body, outModel, useName);
-      if (!payload) return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
 
       if (reqObj.stream) return sse(payload, outModel);
       json(payload);

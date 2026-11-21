@@ -338,6 +338,40 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(r.status.indexOf('200') > 0 && r.body.indexOf('ModelHub') > 0, 'GET /mh/ 返回面板', { status: r.status, len: (r.body || '').length });
   ok(r.body.indexOf('__HTML__') < 0, 'HTML 无占位符残留');
 
+  r = await installQX(mkReq('/mh'), { file: PANEL });
+  ok(r.status.indexOf('200') > 0 && r.body.indexOf('ModelHub') > 0, 'GET /mh（无斜杠）也能开', r.status);
+
+  r = await installQX(mkReq('/mh/api/ping'), { file: PANEL });
+  j = jparse(r);
+  ok(j && j.pong === 1 && j.v, '诊断端点 /api/ping', j);
+
+  r = await installQX(mkReq('/'), { file: PANEL });
+  ok(r.status.indexOf('200') > 0 && r.body.indexOf('ModelHub') > 0, '根路径也回面板', r.status);
+
+  console.log('\n【17】Token 用量统计');
+  r = await installQX(mkReq('/mh/api/state'), { file: PANEL });
+  j = jparse(r);
+  ok(j && j.usage && j.usage.today.t > 0, '今日用量已记录', j && j.usage && j.usage.today);
+  ok(j && j.usage.byDay.length === 14, '14 天序列', j && j.usage.byDay && j.usage.byDay.length);
+  ok(j && j.usage.tops.length > 0, '分模型排行', j && j.usage.tops);
+  ok(j && j.usage.week.t >= j.usage.today.t, '近7天 >= 今日');
+
+  const dk = (n) => { const d = new Date(Date.now() - n * 86400000); const m = d.getMonth() + 1, dd = d.getDate(); return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd); };
+  stObj = JSON.parse(store['modelhub.state.v1']);
+  stObj.usage.days[dk(1)] = { p: 100, c: 200, t: 300, n: 3 };
+  stObj.usage.days[dk(20)] = { p: 1000, c: 2000, t: 3000, n: 30 };
+  store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
+  r = await installQX(mkReq('/mh/api/state'), { file: PANEL });
+  j = jparse(r);
+  ok(j && j.usage.week.t >= 300, '近7天含昨天', j && j.usage.week);
+  ok(j && j.usage.month.t >= 3300, '近30天含20天前', j && j.usage.month);
+  ok(j && j.usage.month.t > j.usage.week.t, '月度 > 周度');
+
+  r = await installQX(mkReq('/mh/api/usage.reset', 'POST', {}), { file: PANEL });
+  r = await installQX(mkReq('/mh/api/state'), { file: PANEL });
+  j = jparse(r);
+  ok(j && j.usage.today.t === 0 && j.usage.total.t === 0, '重置后归零', j && j.usage && j.usage.total);
+
   console.log('\n' + '='.repeat(52));
   console.log('通过 ' + pass + ' / 失败 ' + failed);
   console.log('='.repeat(52));

@@ -108,13 +108,23 @@
         return oaiErr(MH.errText(r.statusCode, r.body), r.statusCode, 'upstream_error');
       }
 
+      var payload = toOpenAI(p0, r.body, outModel, useName);
+      if (!payload) {
+        if (m2) MH.applyProbe(st2, m2, '上游返回无法解析', lat);
+        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 返回无法解析');
+        bump(st2, m2);
+        MH.save(st2);
+        return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
+      }
+
+      // 记一笔 token 用量
+      var tk = (payload.usage && payload.usage.total_tokens) || 0;
+      MH.recordUsage(st2, first.id, payload.usage || {});
+
       if (m2) { m2.ok = true; m2.err = ''; m2.fails = 0; m2.cooldown = 0; m2.lat = lat; m2.checkedAt = MH.now(); }
-      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms');
+      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms · ' + tk + 'tk');
       bump(st2, m2);
       MH.save(st2);
-
-      var payload = toOpenAI(p0, r.body, outModel, useName);
-      if (!payload) return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
 
       if (reqObj.stream) return sse(payload, outModel);
       json(payload);

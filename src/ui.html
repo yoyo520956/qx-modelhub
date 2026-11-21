@@ -154,6 +154,10 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
 .empty b{display:block;font-size:15px;color:var(--tx2);margin-bottom:5px;font-weight:600}
 pre.log{font:11.5px/1.55 ui-monospace,Menlo,monospace;color:var(--tx2);margin:0;
   padding:12px 14px;max-height:64vh;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.bars{display:flex;gap:3px;align-items:flex-end;height:46px;margin:10px 0 8px}
+.bars>div{flex:1;background:linear-gradient(180deg,#5b8cff,#33509e);border-radius:2px;
+  min-height:2px;transition:.25s;opacity:.9}
+.bars>div:hover{opacity:1;background:linear-gradient(180deg,#7aa2ff,#3d63c4)}
 .bar{height:3px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:7px}
 .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac),var(--ok));transition:.3s}
 .warnbox{background:rgba(255,182,72,.07);border:1px solid rgba(255,182,72,.22);border-radius:11px;
@@ -215,6 +219,13 @@ function h(s){ // 转义
   return String(s).replace(/[&<>"']/g, function(c){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
+}
+function fmtNum(n){
+  n = n||0;
+  if(n>=1e9) return (n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1)+'k';
+  return String(n);
 }
 function ms(v){ if(!v||v<0) return '—'; return v<1000? v+'ms' : (v/1000).toFixed(v<10000?2:1)+'s'; }
 function ago(t){
@@ -282,6 +293,41 @@ function renderOv(){
     + '<div class="stat"><b>'+(st.providers||0)+'</b><span>提供商</span></div>'
     + '</div>';
 
+  // ---- Token 用量 ----
+  var us = S.usage || {today:{},week:{},month:{},byDay:[],tops:[],total:{}};
+  var maxT = 0;
+  (us.byDay||[]).forEach(function(x){ if(x.t>maxT) maxT=x.t; });
+  var bars = '';
+  (us.byDay||[]).forEach(function(x){
+    var hp = maxT ? Math.max(2, Math.round(x.t/maxT*100)) : 2;
+    bars += '<div title="'+h(x.d)+' · '+fmtNum(x.t)+' tokens · '+x.n+' 次" style="height:'+hp+'%"></div>';
+  });
+
+  html += '<div class="card">'
+    + '<div class="row" style="margin-bottom:10px"><div class="card-h" style="margin:0;flex:1">Token 消耗</div>'
+    + '<button class="btn sm ghost" onclick="resetUsage()">重置</button></div>'
+    + '<div class="stats" style="margin-bottom:0">'
+    +   '<div class="stat"><b>'+fmtNum(us.today&&us.today.t)+'</b><span>今日</span></div>'
+    +   '<div class="stat"><b>'+fmtNum(us.week&&us.week.t)+'</b><span>近 7 天</span></div>'
+    +   '<div class="stat"><b>'+fmtNum(us.month&&us.month.t)+'</b><span>近 30 天</span></div>'
+    + '</div>'
+    + '<div class="bars">'+bars+'</div>'
+    + '<div class="row" style="justify-content:space-between;font-size:11.5px;color:var(--tx3)">'
+    +   '<span>14 天前</span><span>今日 · '+(us.today&&us.today.n||0)+' 次请求</span>'
+    + '</div>';
+
+  if(us.tops && us.tops.length){
+    html += '<div style="margin-top:12px;border-top:1px solid var(--line);padding-top:10px">';
+    us.tops.slice(0,4).forEach(function(t){
+      html += '<div class="row" style="justify-content:space-between;padding:3px 0">'
+        + '<span style="font-size:12.5px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62%" class="mono">'+h(t.name)+'</span>'
+        + '<span class="mono" style="font-size:12px;color:var(--tx3)">'+fmtNum(t.t)+' · '+t.n+'次</span>'
+        + '</div>';
+    });
+    html += '</div>';
+  }
+  html += '</div>';
+
   var lastCheck = 0, anyEnabled=0;
   (S.models||[]).forEach(function(m){ if(m.checkedAt>lastCheck) lastCheck=m.checkedAt; if(m.enabled) anyEnabled++; });
 
@@ -305,7 +351,7 @@ function renderOv(){
         html += '<div class="item"><div class="dot '+(m.ok===true?'ok':(m.ok===false?'bad':'warn'))+'"></div>'
           + '<div class="main"><div class="t">'+h(m.alias||m.name)+(i===0?' <span class="tag ac">首选</span>':'')+'</div>'
           + '<div class="s">'+h(m.pname)+' · '+(m.ok===true?'正常':(m.ok===false?'失败':'未检测'))+'</div></div>'
-          + '<span class="mono" style="color:var(--tx2)">'+ms(m.lat)+'</span></div>';
+          + '<span class="mono" style="color:var(--tx2)">'+(m.ok===true?ms(m.lat):'—')+'</span></div>';
       });
       html += '</div>';
     }
@@ -316,6 +362,10 @@ function renderOv(){
   $('#s-ov').innerHTML = html;
 }
 
+function resetUsage(){
+  if(!confirm('清零所有 Token 统计？模型和 Key 不受影响。')) return;
+  api('usage.reset',{}).then(function(d){ toast(d.ok?'已清零':'失败', d.ok?'ok':'err'); load(); });
+}
 function stratName(s){
   return {latency:'最快可用', priority:'优先级', weight:'权重随机', rr:'轮询'}[s] || '最快可用';
 }
@@ -406,11 +456,11 @@ function renderPv(){
     api('provider.add', {name:name||base, base:base, key:key, type:type}).then(function(d){
       b.classList.remove('busy'); b.disabled=false;
       if(!d.ok){ toast(d.err||'添加失败','err'); return; }
-      if(d.warn){ toast(d.warn,'err'); }
       $('#fKey').value=''; $('#fName').value=''; $('#fBase').value='';
       Array.prototype.forEach.call($('#presets').children, function(x){x.classList.remove('on')});
       cur=-1;
-      if(d.models && d.models.length){ openPicker(d.pid, d.discovered, d.models); }
+      if(d.warn){ toast(d.warn,'err'); }
+      else if(d.models && d.models.length){ openPicker(d.pid, d.discovered, d.models); }
       else { toast('已保存，但这个接口没返回模型列表','ok'); }
       load();
     });
@@ -446,10 +496,10 @@ function openPicker(pid, all, have){
   });
   $('#pkBody').innerHTML = html;
   $('#picker').classList.add('on');
-  $('#pkBody').addEventListener('click', function(e){
+  $('#pkBody').onclick = function(e){
     var r = e.target.closest('.pk'); if(!r) return;
     r.classList.toggle('on');
-  });
+  };
 }
 $('#pkAll').addEventListener('click', function(){
   var all=Array.prototype.slice.call($('#pkBody').querySelectorAll('.pk'));
@@ -670,6 +720,15 @@ function mockState(){
       {id:'p3::llama-3.3-70b',pid:'p3',pname:'Groq',name:'llama-3.3-70b-versatile',alias:'',enabled:true,ok:false,lat:0,checkedAt:now-300000,hits:5,fails:9,err:'401 Unauthorized',cooldown:now+600000}
     ],
     stats:{total:6,enabled:5,healthy:4,providers:3,fastest:'qwen',fastestMs:366},
+    usage:{today:{p:3120,c:4180,t:7300,n:7},week:{p:41200,c:53100,t:94300,n:96},
+      month:{p:186000,c:241000,t:427000,n:412},total:{p:520000,c:680000,t:1200000,n:1180},
+      byDay:[{d:'11-09',t:21000,n:22},{d:'11-10',t:34000,n:31},{d:'11-11',t:18000,n:19},{d:'11-12',t:52000,n:48},
+             {d:'11-13',t:61000,n:55},{d:'11-14',t:28000,n:26},{d:'11-15',t:12000,n:11},{d:'11-16',t:44000,n:40},
+             {d:'11-17',t:73000,n:66},{d:'11-18',t:39000,n:35},{d:'11-19',t:25000,n:23},{d:'11-20',t:58000,n:52},
+             {d:'11-21',t:67000,n:60},{d:'11-22',t:7300,n:7}],
+      tops:[{id:'p2::Qwen/Qwen3-235B',name:'Qwen/Qwen3-235B',t:420000,n:380},
+            {id:'p1::deepseek-chat',name:'deepseek-chat',t:310000,n:290},
+            {id:'p1::deepseek-reasoner',name:'deepseek-reasoner',t:180000,n:150}]},
     logs:[{t:now-60000,m:'[check] 6 个模型检测完成，4 可用'},{t:now-120000,m:'[route] 选中 p2::Qwen/Qwen3-235B 412ms'},{t:now-300000,m:'[check] p3::llama-3.3-70b 失败：401 Unauthorized'},{t:now-3600000,m:'[init] 面板启动'}]
   };
 }
@@ -691,7 +750,12 @@ function mockApi(path, body){
 
 /* ============ 启动 ============ */
 load();
-setInterval(load, 20000);
+setInterval(function(){
+  var a = document.activeElement;
+  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;  // 正在填表，不要刷
+  if ($('#picker') && $('#picker').classList.contains('on')) return;
+  load();
+}, 20000);
 </script>
 </body>
 </html>
