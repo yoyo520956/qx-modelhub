@@ -91,6 +91,7 @@ section.active{display:block}
 .dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}
 /* switch */
 .sw{width:44px;height:26px;border-radius:20px;background:#2a3040;position:relative;flex:none;
+  align-self:flex-start;margin-top:2px;
   cursor:pointer;transition:.2s;border:1px solid transparent}
 .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;
   background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}
@@ -121,8 +122,8 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   animation:up .26s cubic-bezier(.22,1,.36,1);padding-bottom:env(safe-area-inset-bottom)}
 @keyframes up{from{transform:translateY(100%)}to{transform:none}}
 .sheet-h{padding:16px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
-.sheet-b{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 0;flex:1}
-.sheet-f{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:9px}
+.sheet-b{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 0;flex:1;min-height:0}
+.sheet-f{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:9px;flex:none}
 .pk{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer}
 .pk:hover{background:var(--card)}
 .pk .cb{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);flex:none;
@@ -499,8 +500,10 @@ function renderMd(){
         + '</div>'
         + '<div class="s mono">'+h(m.name)+' · '+h(m.pname)+(m.err?' · <span style="color:var(--bad)">'+h(m.err)+'</span>':'')+'</div>'
         + '<div class="s">'+(m.checkedAt?ago(m.checkedAt):'—')+' · 命中 '+(m.hits||0)+' · 失败 '+(m.fails||0)+'</div></div>'
-        + '<button class="btn sm ghost" onclick="editAlias(\''+esc(m.id)+'\')">改名</button>'
-        + '</div>';
+        + '<div style="display:flex;flex-direction:column;gap:5px">'
+        +   '<button class="btn sm ghost" onclick="editAlias(\''+esc(m.id)+'\')">改名</button>'
+        +   '<button class="btn sm danger" onclick="delM(\''+esc(m.id)+'\')">删</button>'
+        + '</div></div>';
     });
     html += '</div>';
   }
@@ -528,6 +531,14 @@ function checkSel(){
   api('check', {}).then(function(d){
     if(!d.ok){ toast(d.err||'检测失败','err'); return; }
     toast('检测完成：'+d.healthy+' 可用','ok'); load();
+  });
+}
+function delM(id){
+  var m=(S.models||[]).filter(function(x){return x.id===id})[0];
+  if(!m) return;
+  if(!confirm('从池子里移除「'+(m.alias||m.name)+'」？\n（不会删除提供商）')) return;
+  api('model.del', {ids:[id]}).then(function(d){
+    toast(d.ok?'已移除':'失败', d.ok?'ok':'err'); load();
   });
 }
 function editAlias(id){
