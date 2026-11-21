@@ -274,7 +274,7 @@ function MH_PANEL() {
 
   /* ---------------- 探测 ---------------- */
   if (action === 'check') {
-    var only = params.ids && params.ids.length ? params.ids : null;
+    var only = arr(params.ids); if (!only.length) only = null;
     var list = [];
     for (var i = 0; i < st.models.length; i++) {
       var m = st.models[i];

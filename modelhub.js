@@ -1,6 +1,6 @@
 /*!
  * ModelHub v1.2.1 — Quantumult X 本地模型路由（rewrite 架构，不需要本地服务器）
- * 生成时间: 2026-11-22 07:11
+ * 生成时间: 2026-11-22 07:13
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 版本 =====
@@ -788,7 +788,7 @@ function MH_PANEL() {
 
   /* ---------------- 探测 ---------------- */
   if (action === 'check') {
-    var only = params.ids && params.ids.length ? params.ids : null;
+    var only = arr(params.ids); if (!only.length) only = null;
     var list = [];
     for (var i = 0; i < st.models.length; i++) {
       var m = st.models[i];

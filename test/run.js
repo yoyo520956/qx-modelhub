@@ -240,7 +240,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(r.body && r.body.indexOf('ModelHub') > 0, 'GET /mh 也出面板');
   r = await installQX(mkReq('/mh/api/ping'), { file: F });
   j = jparse(r);
-  ok(j && j.pong === 1 && j.v === '1.2.0', '诊断端点 /api/ping', j);
+  ok(j && j.pong === 1 && /^1\.2\./.test(j.v), '诊断端点 /api/ping', j);
 
   console.log('\n【15】面板实际路径：GET + query 参数');
   store = {}; persist();
