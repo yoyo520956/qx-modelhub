@@ -1,13 +1,13 @@
 /*!
  * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:32
+ * 生成时间: 2026-11-22 02:43
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 面板 UI（内联 HTML）=====
 var MH_VER_ = "1.1.0";
 var MH_HTML_ = "<!DOCTYPE html>\n<html lang=\"zh-CN\">\n<head>\n<meta charset=\"utf-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1\">\n<meta name=\"theme-color\" content=\"#0a0b0e\">\n<meta name=\"apple-mobile-web-app-capable\" content=\"yes\">\n<title>ModelHub · 本地模型路由</title>\n<style>\n:root{\n  --bg:#0a0b0e; --bg2:#111318; --card:#15181f; --card2:#1b1f28;\n  --line:#232833; --line2:#2e3542;\n  --tx:#e8ecf3; --tx2:#9aa4b5; --tx3:#5f6a7d;\n  --ac:#5b8cff; --ac2:#7aa2ff; --ok:#3ddc97; --bad:#ff5c5c; --warn:#ffb648;\n  --r:14px;\n}\n*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}\nhtml,body{margin:0;padding:0;background:var(--bg);color:var(--tx);\n  font:15px/1.5 -apple-system,BlinkMacSystemFont,\"SF Pro Text\",\"PingFang SC\",\"Helvetica Neue\",sans-serif;\n  -webkit-font-smoothing:antialiased;overscroll-behavior-y:none}\nbody{padding-bottom:calc(72px + env(safe-area-inset-bottom))}\na{color:var(--ac);text-decoration:none}\n/* ---------- top ---------- */\n.top{position:sticky;top:0;z-index:50;background:rgba(10,11,14,.82);\n  backdrop-filter:saturate(180%) blur(20px);-webkit-backdrop-filter:saturate(180%) blur(20px);\n  border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 16px 10px}\n.top-row{display:flex;align-items:center;gap:10px}\n.logo{font-weight:700;font-size:17px;letter-spacing:-.3px;display:flex;align-items:center;gap:8px}\n.logo i{width:9px;height:9px;border-radius:50%;background:var(--tx3);display:inline-block;\n  box-shadow:0 0 0 0 rgba(61,220,151,.5);transition:.3s}\n.logo i.on{background:var(--ok);box-shadow:0 0 0 4px rgba(61,220,151,.14)}\n.logo i.dead{background:var(--bad);box-shadow:0 0 0 4px rgba(255,92,92,.14)}\n.spacer{flex:1}\n.hint{font-size:11.5px;color:var(--tx3);margin-top:3px}\n/* ---------- buttons ---------- */\n.btn{appearance:none;border:1px solid var(--line2);background:var(--card2);color:var(--tx);\n  padding:8px 13px;border-radius:10px;font-size:13.5px;font-weight:500;cursor:pointer;\n  transition:.16s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}\n.btn:active{transform:scale(.97)}\n.btn:hover{border-color:#3b4454}\n.btn.pri{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}\n.btn.pri:hover{background:var(--ac2);border-color:var(--ac2)}\n.btn.danger{color:var(--bad);border-color:rgba(255,92,92,.32)}\n.btn.danger:hover{background:rgba(255,92,92,.1)}\n.btn.sm{padding:6px 10px;font-size:12.5px;border-radius:8px}\n.btn.ghost{background:transparent}\n.btn:disabled{opacity:.42;cursor:not-allowed}\n.btn.busy{position:relative;color:transparent!important}\n.btn.busy::after{content:\"\";position:absolute;inset:0;margin:auto;width:14px;height:14px;\n  border:2px solid rgba(255,255,255,.32);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite}\n@keyframes sp{to{transform:rotate(360deg)}}\n/* ---------- layout ---------- */\nmain{padding:16px;max-width:860px;margin:0 auto}\nsection{display:none;animation:fade .22s ease}\nsection.active{display:block}\n@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}\n.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}\n.card.tight{padding:0;overflow:hidden}\n.card-h{font-size:12.5px;font-weight:600;letter-spacing:0;\n  color:var(--tx3);margin:0 0 10px}\n.row{display:flex;align-items:center;gap:10px}\n.wrap{flex-wrap:wrap}\n/* ---------- overview ---------- */\n.gw{background:linear-gradient(135deg,#17203a,#111827 60%,#15181f);\n  border:1px solid #26304a;border-radius:var(--r);padding:15px;margin-bottom:12px;position:relative;overflow:hidden}\n.gw::after{content:\"\";position:absolute;right:-40px;top:-40px;width:130px;height:130px;border-radius:50%;\n  background:radial-gradient(circle,rgba(91,140,255,.26),transparent 70%)}\n.gw .lbl{font-size:12px;color:#8ea0c8;letter-spacing:0;font-weight:600}\n.gw .url{font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:7px;\n  word-break:break-all;color:#dbe6ff;background:rgba(0,0,0,.28);padding:9px 11px;border-radius:9px;\n  border:1px solid rgba(255,255,255,.06)}\n.gw .tok{font-size:11.5px;color:#8ea0c8;margin-top:8px}\n.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:12px}\n.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 10px;text-align:center}\n.stat b{display:block;font-size:22px;font-weight:700;letter-spacing:-.5px;font-variant-numeric:tabular-nums}\n.stat span{font-size:11px;color:var(--tx3);display:block;margin-top:2px}\n/* ---------- list ---------- */\n.item{display:flex;align-items:center;gap:11px;padding:12px 14px;border-bottom:1px solid var(--line)}\n.item:last-child{border-bottom:0}\n.item .main{flex:1;min-width:0}\n.item .t{font-size:14.5px;font-weight:560;display:flex;align-items:center;gap:7px;flex-wrap:wrap}\n.item .s{font-size:12px;color:var(--tx3);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}\n.tag{font-size:10.5px;padding:2px 7px;border-radius:20px;font-weight:600;letter-spacing:.02em;\n  background:var(--card2);color:var(--tx2);border:1px solid var(--line2)}\n.tag.ok{color:var(--ok);border-color:rgba(61,220,151,.3);background:rgba(61,220,151,.08)}\n.tag.bad{color:var(--bad);border-color:rgba(255,92,92,.3);background:rgba(255,92,92,.08)}\n.tag.warn{color:var(--warn);border-color:rgba(255,182,72,.3);background:rgba(255,182,72,.08)}\n.tag.ac{color:var(--ac2);border-color:rgba(91,140,255,.3);background:rgba(91,140,255,.08)}\n.dot{width:7px;height:7px;border-radius:50%;background:var(--tx3);flex:none}\n.dot.ok{background:var(--ok)}.dot.bad{background:var(--bad)}.dot.warn{background:var(--warn)}\n/* switch */\n.sw{width:44px;height:26px;border-radius:20px;background:#2a3040;position:relative;flex:none;\n  align-self:flex-start;margin-top:2px;\n  cursor:pointer;transition:.2s;border:1px solid transparent}\n.sw::after{content:\"\";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;\n  background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.4)}\n.sw.on{background:var(--ok)}\n.sw.on::after{transform:translateX(18px)}\n/* form */\nlabel.f{display:block;font-size:12px;color:var(--tx2);margin:0 0 6px;font-weight:500}\ninput[type=text],input[type=password],input[type=number],select,textarea{\n  width:100%;background:var(--bg2);border:1px solid var(--line2);color:var(--tx);\n  padding:10px 12px;border-radius:10px;font-size:14px;font-family:inherit;outline:none;transition:.16s;\n  -webkit-appearance:none;appearance:none}\ninput:focus,select:focus,textarea:focus{border-color:var(--ac);background:#0e1118}\nselect{background-image:url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239aa4b5' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E\");\n  background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}\n.fg{margin-bottom:11px}\n.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}\n.presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}\n.chip{font-size:12px;padding:5px 10px;border-radius:20px;background:var(--card2);\n  border:1px solid var(--line2);cursor:pointer;color:var(--tx2);transition:.15s;white-space:nowrap}\n.chip:hover{border-color:var(--ac);color:var(--tx)}\n.chip.on{background:rgba(91,140,255,.14);border-color:var(--ac);color:var(--ac2)}\n/* model picker */\n.picker{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.62);backdrop-filter:blur(6px);\n  -webkit-backdrop-filter:blur(6px);display:none;align-items:flex-end;justify-content:center}\n.picker.on{display:flex}\n.sheet{background:var(--bg2);width:100%;max-width:640px;max-height:86vh;border-radius:18px 18px 0 0;\n  display:flex;flex-direction:column;border:1px solid var(--line2);border-bottom:0;\n  animation:up .26s cubic-bezier(.22,1,.36,1);padding-bottom:env(safe-area-inset-bottom)}\n@keyframes up{from{transform:translateY(100%)}to{transform:none}}\n.sheet-h{padding:16px 16px 10px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}\n.sheet-b{overflow-y:auto;-webkit-overflow-scrolling:touch;padding:8px 0;flex:1;min-height:0}\n.sheet-f{padding:12px 16px;border-top:1px solid var(--line);display:flex;gap:9px;flex:none}\n.pk{display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer}\n.pk:hover{background:var(--card)}\n.pk .cb{width:20px;height:20px;border-radius:6px;border:1.5px solid var(--line2);flex:none;\n  display:flex;align-items:center;justify-content:center;transition:.15s}\n.pk.on .cb{background:var(--ac);border-color:var(--ac)}\n.pk.on .cb::after{content:\"\";width:5px;height:9px;border:2px solid #fff;border-top:0;border-left:0;\n  transform:rotate(45deg) translateY(-1px)}\n/* toast */\n.toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom));transform:translate(-50%,14px);\n  background:#232a36;color:#fff;padding:10px 17px;border-radius:11px;font-size:13.5px;z-index:400;\n  opacity:0;pointer-events:none;transition:.25s;max-width:88vw;text-align:center;\n  border:1px solid var(--line2);box-shadow:0 8px 30px rgba(0,0,0,.5)}\n.toast.on{opacity:1;transform:translate(-50%,0)}\n.toast.err{background:#3a1d1d;border-color:#5c2626}\n.toast.ok{background:#14342a;border-color:#1d5c46}\n/* tabbar */\n.tabs{position:fixed;left:0;right:0;bottom:0;z-index:60;display:flex;\n  background:rgba(12,14,18,.9);backdrop-filter:blur(22px) saturate(180%);\n  -webkit-backdrop-filter:blur(22px) saturate(180%);border-top:1px solid var(--line);\n  padding-bottom:env(safe-area-inset-bottom)}\n.tabs button{flex:1;appearance:none;background:none;border:0;color:var(--tx3);font-size:10.5px;\n  padding:9px 0 7px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;\n  font-family:inherit;transition:.15s}\n.tabs button .ic{font-size:18px;line-height:1;filter:grayscale(1) opacity(.55);transition:.15s}\n.tabs button.on{color:var(--ac2)}\n.tabs button.on .ic{filter:none}\n.empty{text-align:center;padding:38px 20px;color:var(--tx3);font-size:13.5px;line-height:1.7}\n.empty b{display:block;font-size:15px;color:var(--tx2);margin-bottom:5px;font-weight:600}\npre.log{font:11.5px/1.55 ui-monospace,Menlo,monospace;color:var(--tx2);margin:0;\n  padding:12px 14px;max-height:64vh;overflow:auto;white-space:pre-wrap;word-break:break-all}\n.bars{display:flex;gap:3px;align-items:flex-end;height:46px;margin:10px 0 8px}\n.bars>div{flex:1;background:linear-gradient(180deg,#5b8cff,#33509e);border-radius:2px;\n  min-height:2px;transition:.25s;opacity:.9}\n.bars>div:hover{opacity:1;background:linear-gradient(180deg,#7aa2ff,#3d63c4)}\n.bar{height:3px;border-radius:3px;background:var(--line2);overflow:hidden;margin-top:7px}\n.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--ac),var(--ok));transition:.3s}\n.warnbox{background:rgba(255,182,72,.07);border:1px solid rgba(255,182,72,.22);border-radius:11px;\n  padding:11px 13px;font-size:12.5px;color:#e8c98c;line-height:1.65;margin-bottom:12px}\n.warnbox b{color:var(--warn)}\n</style>\n</head>\n<body>\n<div class=\"top\">\n  <div class=\"top-row\">\n    <div class=\"logo\"><i id=\"dot\"></i>ModelHub</div>\n    <div class=\"spacer\"></div>\n    <button class=\"btn sm\" id=\"btnCheck\">检测</button>\n    <button class=\"btn sm pri\" id=\"btnAdd\">+ 提供商</button>\n  </div>\n  <div class=\"hint\" id=\"sub\">本地模型路由 · 加载中…</div>\n</div>\n<main>\n  <section id=\"s-ov\" class=\"active\"></section>\n  <section id=\"s-pv\"></section>\n  <section id=\"s-md\"></section>\n  <section id=\"s-rt\"></section>\n  <section id=\"s-lg\"></section>\n</main>\n<div class=\"tabs\">\n  <button data-t=\"ov\" class=\"on\"><span class=\"ic\">◈</span>概览</button>\n  <button data-t=\"pv\"><span class=\"ic\">☁</span>提供商</button>\n  <button data-t=\"md\"><span class=\"ic\">▤</span>模型</button>\n  <button data-t=\"rt\"><span class=\"ic\">⇄</span>路由</button>\n  <button data-t=\"lg\"><span class=\"ic\">≡</span>日志</button>\n</div>\n<div class=\"picker\" id=\"picker\">\n  <div class=\"sheet\">\n    <div class=\"sheet-h\">\n      <div style=\"flex:1\">\n        <div style=\"font-weight:600;font-size:15px\" id=\"pkTitle\">发现模型</div>\n        <div style=\"font-size:12px;color:var(--tx3);margin-top:2px\" id=\"pkSub\"></div>\n      </div>\n      <button class=\"btn sm ghost\" id=\"pkAll\">全选</button>\n    </div>\n    <div class=\"sheet-b\" id=\"pkBody\"></div>\n    <div class=\"sheet-f\">\n      <button class=\"btn\" id=\"pkCancel\" style=\"flex:1\">取消</button>\n      <button class=\"btn pri\" id=\"pkOk\" style=\"flex:2\">添加所选</button>\n    </div>\n  </div>\n</div>\n<div class=\"toast\" id=\"toast\"></div>\n<script>\n/* ============ 基础 ============ */\nvar S = null, TAB = 'ov', PICK = [], PKPID = '';\nvar P = location.pathname; if(!/\\/$/.test(P)) P = P.replace(/[^/]*$/,'');\nvar API = (P.replace(/\\/$/,'')) + '/api/';\nvar MOCK = (location.protocol==='file:') || /[?&]mock=1/.test(location.search);\n\nfunction $(s){return document.querySelector(s)}\nfunction h(s){ // 转义\n  if(s===null||s===undefined) return '';\n  return String(s).replace(/[&<>\"']/g, function(c){\n    return {'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',\"'\":'&#39;'}[c];\n  });\n}\nfunction fmtNum(n){\n  n = n||0;\n  if(n>=1e9) return (n/1e9).toFixed(1)+'B';\n  if(n>=1e6) return (n/1e6).toFixed(1)+'M';\n  if(n>=1e3) return (n/1e3).toFixed(n>=1e4?0:1)+'k';\n  return String(n);\n}\nfunction ms(v){ if(!v||v<0) return '—'; return v<1000? v+'ms' : (v/1000).toFixed(v<10000?2:1)+'s'; }\nfunction ago(t){\n  if(!t) return '从未';\n  var d=Date.now()-t; if(d<0) d=0;\n  if(d<60000) return Math.max(1,Math.round(d/1000))+'s 前';\n  if(d<3600000) return Math.round(d/60000)+'m 前';\n  if(d<86400000) return Math.round(d/3600000)+'h 前';\n  return Math.round(d/86400000)+'d 前';\n}\nfunction toast(msg, kind){\n  var t=$('#toast'); t.textContent=msg; t.className='toast on'+(kind?' '+kind:'');\n  clearTimeout(t._t); t._t=setTimeout(function(){t.className='toast'}, 2600);\n}\n\n/* ============ API ============ */\nfunction api(path, body){\n  if(MOCK) return mockApi(path, body);\n  var opt = {method: body?'POST':'GET', headers:{}};\n  if(body){ opt.headers['Content-Type']='application/json'; opt.body=JSON.stringify(body); }\n  return fetch(API+path, opt).then(function(r){ return r.json(); })\n    .catch(function(e){ return {ok:false, err:'网络错误: '+e.message}; });\n}\n\n/* ============ 渲染 ============ */\nfunction load(){\n  api('state').then(function(d){\n    if(!d || !d.ok){ $('#sub').textContent = '读取失败：'+((d&&d.err)||'未知'); return; }\n    S = d; render();\n  });\n}\n\nfunction render(){\n  if(!S) return;\n  var st=S.stats||{};\n  $('#dot').className = st.healthy>0 ? 'on' : (st.enabled>0?'dead':'');\n  $('#sub').textContent = '可用 '+st.healthy+' / 已启用 '+st.enabled+' / 共 '+st.total+\n    ' · 最快 '+(st.fastest? st.fastest+' ('+ms(st.fastestMs)+')' : '—');\n  ({ov:renderOv, pv:renderPv, md:renderMd, rt:renderRt, lg:renderLg})[TAB]();\n  $('#s-ov').className = TAB==='ov'?'active':'';\n  $('#s-pv').className = TAB==='pv'?'active':'';\n  $('#s-md').className = TAB==='md'?'active':'';\n  $('#s-rt').className = TAB==='rt'?'active':'';\n  $('#s-lg').className = TAB==='lg'?'active':'';\n}\n\n/* ---------- 概览 ---------- */\nfunction renderOv(){\n  var st=S.stats||{}, cfg=S.cfg||{};\n  var gw = (S.gwBase||'') + '/v1';\n  var html = '';\n  html += '<div class=\"gw\">'\n    + '<div class=\"lbl\">网关地址 · OpenAI 兼容接口</div>'\n    + '<div class=\"url\" id=\"gwUrl\">'+h(gw)+'</div>'\n    + '<div class=\"tok\">API Key 填：'+(cfg.gwToken? '<span class=\"mono\">'+h(cfg.gwToken)+'</span>' : '<span style=\"color:#ffb648\">未设置（建议去路由页设一个）</span>')+'</div>'\n    + '<div class=\"row\" style=\"margin-top:11px;gap:8px\">'\n    +   '<button class=\"btn sm\" onclick=\"copyGw()\">复制地址</button>'\n    +   '<button class=\"btn sm\" onclick=\"copyKey()\">复制 Key</button>'\n    +   '<button class=\"btn sm ghost\" onclick=\"document.querySelector(\\'[data-t=rt]\\').click()\">路由设置</button>'\n    + '</div></div>';\n\n  html += '<div class=\"stats\">'\n    + '<div class=\"stat\"><b style=\"color:var(--ok)\">'+(st.healthy||0)+'</b><span>可用模型</span></div>'\n    + '<div class=\"stat\"><b>'+(st.enabled||0)+'</b><span>已启用</span></div>'\n    + '<div class=\"stat\"><b>'+(st.providers||0)+'</b><span>提供商</span></div>'\n    + '</div>';\n\n  // ---- Token 用量 ----\n  var us = S.usage || {today:{},week:{},month:{},byDay:[],tops:[],total:{}};\n  var maxT = 0;\n  (us.byDay||[]).forEach(function(x){ if(x.t>maxT) maxT=x.t; });\n  var bars = '';\n  (us.byDay||[]).forEach(function(x){\n    var hp = maxT ? Math.max(2, Math.round(x.t/maxT*100)) : 2;\n    bars += '<div title=\"'+h(x.d)+' · '+fmtNum(x.t)+' tokens · '+x.n+' 次\" style=\"height:'+hp+'%\"></div>';\n  });\n\n  html += '<div class=\"card\">'\n    + '<div class=\"row\" style=\"margin-bottom:10px\"><div class=\"card-h\" style=\"margin:0;flex:1\">Token 消耗</div>'\n    + '<button class=\"btn sm ghost\" onclick=\"resetUsage()\">重置</button></div>'\n    + '<div class=\"stats\" style=\"margin-bottom:0\">'\n    +   '<div class=\"stat\"><b>'+fmtNum(us.today&&us.today.t)+'</b><span>今日</span></div>'\n    +   '<div class=\"stat\"><b>'+fmtNum(us.week&&us.week.t)+'</b><span>近 7 天</span></div>'\n    +   '<div class=\"stat\"><b>'+fmtNum(us.month&&us.month.t)+'</b><span>近 30 天</span></div>'\n    + '</div>'\n    + '<div class=\"bars\">'+bars+'</div>'\n    + '<div class=\"row\" style=\"justify-content:space-between;font-size:11.5px;color:var(--tx3)\">'\n    +   '<span>14 天前</span><span>今日 · '+(us.today&&us.today.n||0)+' 次请求</span>'\n    + '</div>';\n\n  if(us.tops && us.tops.length){\n    html += '<div style=\"margin-top:12px;border-top:1px solid var(--line);padding-top:10px\">';\n    us.tops.slice(0,4).forEach(function(t){\n      html += '<div class=\"row\" style=\"justify-content:space-between;padding:3px 0\">'\n        + '<span style=\"font-size:12.5px;color:var(--tx2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:62%\" class=\"mono\">'+h(t.name)+'</span>'\n        + '<span class=\"mono\" style=\"font-size:12px;color:var(--tx3)\">'+fmtNum(t.t)+' · '+t.n+'次</span>'\n        + '</div>';\n    });\n    html += '</div>';\n  }\n  html += '</div>';\n\n  var lastCheck = 0, anyEnabled=0;\n  (S.models||[]).forEach(function(m){ if(m.checkedAt>lastCheck) lastCheck=m.checkedAt; if(m.enabled) anyEnabled++; });\n\n  html += '<div class=\"card\">'\n    + '<div class=\"card-h\">状态</div>'\n    + '<div class=\"row\" style=\"justify-content:space-between;margin-bottom:9px\"><span style=\"font-size:13.5px;color:var(--tx2)\">最近检测</span><span class=\"mono\">'+ago(lastCheck)+'</span></div>'\n    + '<div class=\"row\" style=\"justify-content:space-between;margin-bottom:9px\"><span style=\"font-size:13.5px;color:var(--tx2)\">轮询间隔</span><span class=\"mono\">每 '+(S.cfg&&S.cfg.checkMin||10)+' 分钟</span></div>'\n    + '<div class=\"row\" style=\"justify-content:space-between\"><span style=\"font-size:13.5px;color:var(--tx2)\">路由策略</span><span class=\"mono\">'+h(stratName(S.cfg&&S.cfg.strategy))+'</span></div>'\n    + '</div>';\n\n  if(!(S.models||[]).length){\n    html += '<div class=\"card\"><div class=\"empty\"><b>还没有模型</b>先去「提供商」添加一个 API，输入 Key 后会自动拉取模型列表。</div></div>';\n  } else {\n    var top = (S.models||[]).filter(function(m){return m.enabled}).sort(function(a,b){\n      if((a.ok?0:1)!==(b.ok?0:1)) return (a.ok?0:1)-(b.ok?0:1);\n      return (a.lat||9e9)-(b.lat||9e9);\n    }).slice(0,3);\n    if(top.length){\n      html += '<div class=\"card tight\"><div class=\"card-h\" style=\"padding:13px 14px 8px;margin:0\">当前优先使用</div>';\n      top.forEach(function(m,i){\n        html += '<div class=\"item\"><div class=\"dot '+(m.ok===true?'ok':(m.ok===false?'bad':'warn'))+'\"></div>'\n          + '<div class=\"main\"><div class=\"t\">'+h(m.alias||m.name)+(i===0?' <span class=\"tag ac\">首选</span>':'')+'</div>'\n          + '<div class=\"s\">'+h(m.pname)+' · '+(m.ok===true?'正常':(m.ok===false?'失败':'未检测'))+'</div></div>'\n          + '<span class=\"mono\" style=\"color:var(--tx2)\">'+(m.ok===true?ms(m.lat):'—')+'</span></div>';\n      });\n      html += '</div>';\n    }\n  }\n\n  html += '<div class=\"warnbox\"><b>怎么用：</b>把任意 OpenAI 兼容客户端（ChatBox / OpenCat / NextChat / LobeChat / 自建脚本）的 Base URL 设成上面那个地址，Key 填网关 Key，模型选面板里添加过的名字即可。不管填哪个模型名，路由都会自动挑当前最快的可用线路。</div>';\n\n  $('#s-ov').innerHTML = html;\n}\n\nfunction resetUsage(){\n  if(!confirm('清零所有 Token 统计？模型和 Key 不受影响。')) return;\n  api('usage.reset',{}).then(function(d){ toast(d.ok?'已清零':'失败', d.ok?'ok':'err'); load(); });\n}\nfunction stratName(s){\n  return {latency:'最快可用', priority:'优先级', weight:'权重随机', rr:'轮询'}[s] || '最快可用';\n}\nfunction copyGw(){ copyText((S.gwBase||'')+'/v1'); }\nfunction copyKey(){ copyText((S.cfg&&S.cfg.gwToken)||''); }\nfunction copyText(t){\n  if(!t){ toast('没有内容可复制'); return; }\n  if(navigator.clipboard && navigator.clipboard.writeText){\n    navigator.clipboard.writeText(t).then(function(){toast('已复制','ok')},function(){fallbackCopy(t)});\n  } else fallbackCopy(t);\n}\nfunction fallbackCopy(t){\n  var a=document.createElement('textarea'); a.value=t; a.style.position='fixed'; a.style.opacity='0';\n  document.body.appendChild(a); a.select();\n  try{ document.execCommand('copy'); toast('已复制','ok'); }catch(e){ toast('复制失败，请手动选中'); }\n  document.body.removeChild(a);\n}\n\n/* ---------- 提供商 ---------- */\nvar PRESETS = [\n  {n:'OpenAI', t:'openai', b:'https://api.openai.com/v1'},\n  {n:'DeepSeek', t:'openai', b:'https://api.deepseek.com/v1'},\n  {n:'Kimi', t:'openai', b:'https://api.moonshot.cn/v1'},\n  {n:'智谱 GLM', t:'openai', b:'https://open.bigmodel.cn/api/paas/v4'},\n  {n:'通义', t:'openai', b:'https://dashscope.aliyuncs.com/compatible-mode/v1'},\n  {n:'硅基流动', t:'openai', b:'https://api.siliconflow.cn/v1'},\n  {n:'OpenRouter', t:'openai', b:'https://openrouter.ai/api/v1'},\n  {n:'Groq', t:'openai', b:'https://api.groq.com/openai/v1'},\n  {n:'Gemini', t:'gemini', b:'https://generativelanguage.googleapis.com/v1beta'},\n  {n:'Anthropic', t:'anthropic', b:'https://api.anthropic.com/v1'},\n  {n:'自定义', t:'openai', b:''}\n];\n\nfunction renderPv(){\n  var html = '';\n  html += '<div class=\"card\" id=\"addCard\">'\n    + '<div class=\"card-h\">添加提供商</div>'\n    + '<div class=\"fg\"><label class=\"f\">预设</label><div class=\"presets\" id=\"presets\">';\n  PRESETS.forEach(function(p,i){\n    html += '<span class=\"chip\" data-i=\"'+i+'\">'+h(p.n)+'</span>';\n  });\n  html += '</div></div>'\n    + '<div class=\"fg\"><label class=\"f\">名称</label><input type=\"text\" id=\"fName\" placeholder=\"例如 DeepSeek\"></div>'\n    + '<div class=\"fg\"><label class=\"f\">Base URL</label><input type=\"text\" id=\"fBase\" placeholder=\"https://api.deepseek.com/v1\" autocapitalize=\"off\" autocorrect=\"off\" spellcheck=\"false\"></div>'\n    + '<div class=\"fg\"><label class=\"f\">API Key</label><input type=\"password\" id=\"fKey\" placeholder=\"sk-...\" autocapitalize=\"off\" autocorrect=\"off\" spellcheck=\"false\"></div>'\n    + '<button class=\"btn pri\" id=\"btnSave\" style=\"width:100%;justify-content:center\">保存并拉取模型</button>'\n    + '<div style=\"font-size:11.5px;color:var(--tx3);margin-top:9px;line-height:1.6\">Key 只保存在本机 Quantumult X 的 $prefs 里，不上传任何服务器。Base URL 要填到版本号为止（如 <span class=\"mono\">https://api.deepseek.com/v1</span>），拉取模型就是请求 {Base}/models。</div>'\n    + '</div>';\n\n  var ps = S.providers||[];\n  if(!ps.length){\n    html += '<div class=\"card\"><div class=\"empty\"><b>暂无提供商</b>选个预设，填上 Key 就行。</div></div>';\n  } else {\n    html += '<div class=\"card tight\"><div class=\"card-h\" style=\"padding:13px 14px 8px;margin:0\">已添加 ('+ps.length+')</div>';\n    ps.forEach(function(p){\n      var n = (S.models||[]).filter(function(m){return m.pid===p.id}).length;\n      var en = (S.models||[]).filter(function(m){return m.pid===p.id&&m.enabled}).length;\n      html += '<div class=\"item\">'\n        + '<div class=\"dot '+(p.ok===true?'ok':(p.ok===false?'bad':''))+'\"></div>'\n        + '<div class=\"main\"><div class=\"t\">'+h(p.name)+' <span class=\"tag\">'+h(p.type)+'</span></div>'\n        + '<div class=\"s mono\">'+h(p.base)+'</div>'\n        + '<div class=\"s\">Key '+h(p.keyMask)+' · 模型 '+en+'/'+n+(p.lastErr?' · <span style=\"color:var(--bad)\">'+h(p.lastErr)+'</span>':'')+'</div></div>'\n        + '<div style=\"display:flex;flex-direction:column;gap:6px\">'\n        +   '<button class=\"btn sm\" onclick=\"syncP(\\''+p.id+'\\')\">拉取</button>'\n        +   '<button class=\"btn sm danger\" onclick=\"delP(\\''+p.id+'\\')\">删</button>'\n        + '</div></div>';\n    });\n    html += '</div>';\n  }\n  $('#s-pv').innerHTML = html;\n\n  var cur = -1;\n  $('#presets').addEventListener('click', function(e){\n    var c = e.target.closest('.chip'); if(!c) return;\n    var i = +c.dataset.i, p = PRESETS[i];\n    Array.prototype.forEach.call($('#presets').children, function(x){x.classList.remove('on')});\n    c.classList.add('on');\n    $('#fBase').value = p.b; $('#fName').value = p.n==='自定义'?'':p.n;\n    cur = i;\n    if(p.n!=='自定义') $('#fKey').focus();\n  });\n  $('#btnSave').addEventListener('click', function(){\n    var name=$('#fName').value.trim(), base=$('#fBase').value.trim(), key=$('#fKey').value.trim();\n    if(!base){ toast('先填 Base URL'); return; }\n    if(!key){ toast('先填 API Key'); return; }\n    var type = cur>=0 ? PRESETS[cur].t : 'openai';\n    var b = this; b.classList.add('busy'); b.disabled=true;\n    api('provider.add', {name:name||base, base:base, key:key, type:type}).then(function(d){\n      b.classList.remove('busy'); b.disabled=false;\n      if(!d.ok){ toast(d.err||'添加失败','err'); return; }\n      $('#fKey').value=''; $('#fName').value=''; $('#fBase').value='';\n      Array.prototype.forEach.call($('#presets').children, function(x){x.classList.remove('on')});\n      cur=-1;\n      if(d.warn){ toast(d.warn,'err'); }\n      else if(d.models && d.models.length){ openPicker(d.pid, d.discovered, d.models); }\n      else { toast('已保存，但这个接口没返回模型列表','ok'); }\n      load();\n    });\n  });\n}\n\nfunction syncP(id){\n  toast('正在拉取…');\n  api('provider.sync', {id:id}).then(function(d){\n    if(!d.ok){ toast(d.err||'拉取失败','err'); return; }\n    if(d.discovered && d.discovered.length) openPicker(id, d.discovered, d.models);\n    else toast('没有新模型');\n    load();\n  });\n}\nfunction delP(id){\n  if(!confirm('删除这个提供商和它的全部模型？')) return;\n  api('provider.del', {id:id}).then(function(d){ load(); toast(d.ok?'已删除':'失败', d.ok?'ok':'err'); });\n}\n\n/* ---------- 模型选择器 ---------- */\nfunction openPicker(pid, all, have){\n  PKPID = pid; PICK = [];\n  var exist = {}; (have||[]).forEach(function(m){ exist[m]=1 });\n  $('#pkTitle').textContent = '发现 '+all.length+' 个模型';\n  $('#pkSub').textContent = have&&have.length ? '已添加 '+have.length+' 个' : '全选后添加';\n  var html='';\n  all.forEach(function(n){\n    var on = !!exist[n];\n    html += '<div class=\"pk'+(on?' on':'')+'\" data-n=\"'+h(n)+'\"><div class=\"cb\"></div>'\n      + '<div style=\"flex:1;font-size:14px\" class=\"mono\">'+h(n)+'</div>'\n      + (on?'<span class=\"tag ok\">已有</span>':'')+'</div>';\n  });\n  $('#pkBody').innerHTML = html;\n  $('#picker').classList.add('on');\n  $('#pkBody').onclick = function(e){\n    var r = e.target.closest('.pk'); if(!r) return;\n    r.classList.toggle('on');\n  };\n}\n$('#pkAll').addEventListener('click', function(){\n  var all=Array.prototype.slice.call($('#pkBody').querySelectorAll('.pk'));\n  var anyOff=all.some(function(x){return !x.classList.contains('on')});\n  all.forEach(function(x){ x.classList.toggle('on', anyOff) });\n});\n$('#pkCancel').addEventListener('click', function(){ $('#picker').classList.remove('on') });\n$('#pkOk').addEventListener('click', function(){\n  var names = Array.prototype.slice.call($('#pkBody').querySelectorAll('.pk.on')).map(function(x){return x.dataset.n});\n  if(!names.length){ toast('没选任何模型'); return; }\n  var b=this; b.classList.add('busy');\n  api('model.add', {pid:PKPID, names:names}).then(function(d){\n    b.classList.remove('busy');\n    $('#picker').classList.remove('on');\n    toast(d.ok? ('已添加 '+names.length+' 个'):'失败', d.ok?'ok':'err');\n    load();\n  });\n});\n\n/* ---------- 模型列表 ---------- */\nvar MFILTER = '';\nfunction renderMd(){\n  var ms_ = S.models||[];\n  var html = '';\n  html += '<div class=\"card\" style=\"padding:11px 12px\">'\n    + '<input type=\"text\" id=\"mq\" placeholder=\"搜索模型 / 提供商\" value=\"'+h(MFILTER)+'\">'\n    + '<div class=\"row wrap\" style=\"margin-top:10px;gap:7px\">'\n    + '<button class=\"btn sm\" onclick=\"bulk(1)\">全启用</button>'\n    + '<button class=\"btn sm\" onclick=\"bulk(0)\">全停用</button>'\n    + '<button class=\"btn sm\" onclick=\"checkSel()\" style=\"margin-left:auto\">检测以上</button>'\n    + '</div></div>';\n  var list = ms_.filter(function(m){\n    if(!MFILTER) return true;\n    var q=MFILTER.toLowerCase();\n    return (m.name+' '+(m.alias||'')+' '+m.pname).toLowerCase().indexOf(q)>=0;\n  });\n  if(!list.length){\n    html += '<div class=\"card\"><div class=\"empty\"><b>'+(ms_.length?'没匹配到':'还没有模型')+'</b>'+(ms_.length?'换个关键词试试':'先去「提供商」添加')+'</div></div>';\n  } else {\n    html += '<div class=\"card tight\">';\n    list.forEach(function(m){\n      var cd = m.cooldown && m.cooldown>Date.now();\n      html += '<div class=\"item\">'\n        + '<div class=\"sw'+(m.enabled?' on':'')+'\" onclick=\"toggleM(\\''+esc(m.id)+'\\','+(!m.enabled)+')\"></div>'\n        + '<div class=\"main\"><div class=\"t\">'+h(m.alias||m.name)\n        +   (m.ok===true?' <span class=\"tag ok\">'+ms(m.lat)+'</span>':(m.ok===false?' <span class=\"tag bad\">失败</span>':' <span class=\"tag\">未测</span>'))\n        +   (cd?' <span class=\"tag warn\">冷却</span>':'')\n        + '</div>'\n        + '<div class=\"s mono\">'+h(m.name)+' · '+h(m.pname)+(m.err?' · <span style=\"color:var(--bad)\">'+h(m.err)+'</span>':'')+'</div>'\n        + '<div class=\"s\">'+(m.checkedAt?ago(m.checkedAt):'—')+' · 命中 '+(m.hits||0)+' · 失败 '+(m.fails||0)+'</div></div>'\n        + '<div style=\"display:flex;flex-direction:column;gap:5px\">'\n        +   '<button class=\"btn sm ghost\" onclick=\"editAlias(\\''+esc(m.id)+'\\')\">改名</button>'\n        +   '<button class=\"btn sm danger\" onclick=\"delM(\\''+esc(m.id)+'\\')\">删</button>'\n        + '</div></div>';\n    });\n    html += '</div>';\n  }\n  $('#s-md').innerHTML = html;\n  var q=$('#mq');\n  if(q){\n    q.addEventListener('input', function(){\n      MFILTER=this.value; var pos=this.selectionStart;\n      renderMd();\n      var n=$('#mq'); if(n){ n.focus(); n.setSelectionRange(pos,pos); }\n    });\n  }\n}\nfunction esc(s){ return String(s).replace(/'/g,\"\\\\'\"); }\nfunction toggleM(id, on){\n  api('model.patch', {id:id, enabled:on}).then(function(){ load(); });\n}\nfunction bulk(on){\n  var ids=(S.models||[]).map(function(m){return m.id});\n  if(!ids.length) return;\n  api('model.patch', {ids:ids, enabled:on}).then(function(){ load(); toast(on?'已全启用':'已全停用','ok'); });\n}\nfunction checkSel(){\n  toast('检测中…');\n  api('check', {}).then(function(d){\n    if(!d.ok){ toast(d.err||'检测失败','err'); return; }\n    toast('检测完成：'+d.healthy+' 可用','ok'); load();\n  });\n}\nfunction delM(id){\n  var m=(S.models||[]).filter(function(x){return x.id===id})[0];\n  if(!m) return;\n  if(!confirm('从池子里移除「'+(m.alias||m.name)+'」？\\n（不会删除提供商）')) return;\n  api('model.del', {ids:[id]}).then(function(d){\n    toast(d.ok?'已移除':'失败', d.ok?'ok':'err'); load();\n  });\n}\nfunction editAlias(id){\n  var m=(S.models||[]).filter(function(x){return x.id===id})[0]; if(!m) return;\n  var v = prompt('别名（客户端里选模型时显示的名字，留空用原名）', m.alias||'');\n  if(v===null) return;\n  api('model.patch', {id:id, alias:v.trim()}).then(function(){ load(); });\n}\n\n/* ---------- 路由 ---------- */\nfunction renderRt(){\n  var c = S.cfg||{};\n  var html = '';\n  html += '<div class=\"card\"><div class=\"card-h\">策略</div>'\n    + '<div class=\"fg\"><label class=\"f\">选择策略</label><select id=\"cStrategy\">'\n    + opt('latency','最快可用（推荐）',c.strategy)\n    + opt('priority','优先级（自定义权重高者优先）',c.strategy)\n    + opt('weight','权重随机（按权重分摊）',c.strategy)\n    + opt('rr','轮询（依次循环）',c.strategy)\n    + '</select></div>'\n    + '<div class=\"grid2\">'\n    + '<div class=\"fg\"><label class=\"f\">数据保鲜 (分钟)</label><input type=\"number\" id=\"cStale\" min=\"1\" max=\"240\" value=\"'+(c.staleMin||5)+'\"></div>'\n    + '<div class=\"fg\"><label class=\"f\">探活间隔 (分钟)</label><input type=\"number\" id=\"cCheck\" min=\"1\" max=\"1440\" value=\"'+(c.checkMin||10)+'\"></div>'\n    + '</div>'\n    + '<div class=\"fg\"><label class=\"f\">网关 API Key（客户端填这个）</label>'\n    + '<div class=\"row\"><input type=\"text\" id=\"cTok\" class=\"mono\" value=\"'+h(c.gwToken||'')+'\" placeholder=\"留空 = 不校验\">'\n    + '<button class=\"btn sm\" onclick=\"genTok()\">生成</button></div></div>'\n    + '<div class=\"fg\"><label class=\"f\">上游超时 (秒)</label><input type=\"number\" id=\"cTmo\" min=\"5\" max=\"300\" value=\"'+Math.round((c.timeoutMs||60000)/1000)+'\"></div>'\n    + '<div class=\"row\" style=\"justify-content:space-between;margin:14px 0 4px\">'\n    +   '<div><div style=\"font-size:13.5px\">覆盖请求里的 model</div><div style=\"font-size:11.5px;color:var(--tx3)\">客户端随便填模型名，路由强制用选中的</div></div>'\n    +   '<div class=\"sw'+((c.overrideModel!==false)?' on':'')+'\" onclick=\"this.classList.toggle(\\'on\\')\" id=\"swOv\"></div></div>'\n    + '<div class=\"row\" style=\"justify-content:space-between;margin:14px 0 4px\">'\n    +   '<div><div style=\"font-size:13.5px\">懒检测（缓存过期时现测）</div><div style=\"font-size:11.5px;color:var(--tx3)\">更准，但首个请求会多花 0.3~2 秒</div></div>'\n    +   '<div class=\"sw'+((c.slidingCheck)?' on':'')+'\" onclick=\"this.classList.toggle(\\'on\\')\" id=\"swSl\"></div></div>'\n    + '<button class=\"btn pri\" id=\"btnSaveCfg\" style=\"width:100%;justify-content:center;margin-top:16px\">保存</button>'\n    + '</div>';\n\n  html += '<div class=\"card\"><div class=\"card-h\">定时任务·需与上面间隔一致</div>'\n    + '<div class=\"gw\" style=\"padding:12px;margin:0\"><div class=\"url\" style=\"font-size:11.5px\" id=\"cronLine\">'+h(cronExpr(c.checkMin||10))+'</div>'\n    + '<div class=\"row\" style=\"margin-top:9px\"><button class=\"btn sm\" onclick=\"copyCron()\">复制这一行</button></div></div>'\n    + '<div style=\"font-size:11.5px;color:var(--tx3);margin-top:9px;line-height:1.6\">这是 QX 里 [task_local] 的那一行。改了探活间隔，记得同步改成上面表达式；不装定时任务也能用，只是可用性数据不会自动刷新。</div>'\n    + '</div>';\n\n  html += '<div class=\"card\"><div class=\"card-h\">工作方式</div>'\n    + '<div style=\"font-size:12.8px;color:var(--tx2);line-height:1.75\">'\n    + '① 面板把你所有已启用的模型汇总成一个虚拟池。<br>'\n    + '② 客户端只认网关地址，请求进来后，路由从池里按策略挑 1 个，<br>'\n    + '&nbsp;&nbsp;&nbsp;换成那家的 Base URL 和 Key 转发出去。<br>'\n    + '③ 「轮询」由 QX 的定时任务每 N 分钟探活一次，把延迟和成败写进本地，<br>'\n    + '&nbsp;&nbsp;&nbsp;所以真正选模型时只读本地缓存，<b style=\"color:var(--ok)\">零网络、微秒级</b>。<br>'\n    + '④ 某家失败会进冷却，冷却期内不再被选中，自动轮到下一家。'\n    + '</div></div>';\n  $('#s-rt').innerHTML = html;\n  $('#btnSaveCfg').addEventListener('click', function(){\n    var b=this; b.classList.add('busy'); b.disabled=true;\n    api('cfg.set', {\n      strategy: $('#cStrategy').value,\n      staleMin: +$('#cStale').value||5,\n      checkMin: +$('#cCheck').value||10,\n      gwToken: $('#cTok').value.trim(),\n      timeoutMs: (+$('#cTmo').value||60)*1000,\n      overrideModel: $('#swOv').classList.contains('on'),\n      slidingCheck: $('#swSl').classList.contains('on')\n    }).then(function(d){\n      b.classList.remove('busy'); b.disabled=false;\n      toast(d.ok?'已保存':'保存失败', d.ok?'ok':'err'); load();\n    });\n  });\n}\nfunction cronExpr(min){\n  if(min%60===0) return '0 */'+(min/60)+' * * * modelhub-cron.js';\n  return '*/'+min+' * * * * modelhub-cron.js';\n}\nfunction copyCron(){ copyText(cronExpr((S.cfg&&S.cfg.checkMin)||10)); }\nfunction opt(v,t,cur){ return '<option value=\"'+v+'\"'+(cur===v?' selected':'')+'>'+t+'</option>'; }\nfunction genTok(){\n  var s='sk-mh-'; var c='abcdef0123456789';\n  for(var i=0;i<28;i++) s+=c[Math.floor(Math.random()*16)];\n  $('#cTok').value=s;\n}\n\n/* ---------- 日志 ---------- */\nfunction renderLg(){\n  var lg = (S.logs||[]).slice().reverse();\n  var html='<div class=\"card tight\"><div class=\"card-h\" style=\"padding:13px 14px 8px;margin:0\">最近 '+lg.length+' 条</div>';\n  if(!lg.length) html+='<div class=\"empty\">暂无日志</div>';\n  else { html+='<pre class=\"log\">'; lg.forEach(function(x){ html+=h(fmtTime(x.t))+'  '+h(x.m)+'\\n' }); html+='</pre>' }\n  html += '</div><div class=\"row\"><button class=\"btn sm danger\" onclick=\"clearLog()\">清空日志</button></div>';\n  $('#s-lg').innerHTML = html;\n}\nfunction fmtTime(t){ var d=new Date(t); function p(n){return n<10?'0'+n:n} return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds()); }\nfunction clearLog(){ api('log.clear',{}).then(function(){ load(); }); }\n\n/* ---------- 交互绑定 ---------- */\ndocument.querySelector('.tabs').addEventListener('click', function(e){\n  var b=e.target.closest('button[data-t]'); if(!b) return;\n  Array.prototype.forEach.call(this.children, function(x){x.classList.remove('on')});\n  b.classList.add('on'); TAB=b.dataset.t;\n  window.scrollTo(0,0); render();\n});\n$('#btnCheck').addEventListener('click', function(){\n  var b=this; b.classList.add('busy'); b.disabled=true;\n  api('check', {}).then(function(d){\n    b.classList.remove('busy'); b.disabled=false;\n    toast(d.ok? ('完成：'+d.healthy+'/'+d.total+' 可用') : (d.err||'失败'), d.ok?'ok':'err');\n    load();\n  });\n});\n$('#btnAdd').addEventListener('click', function(){\n  if(TAB!=='pv'){ document.querySelector('[data-t=pv]').click(); }\n  setTimeout(function(){ var n=$('#fName'); if(n){n.focus(); n.scrollIntoView({block:'center',behavior:'smooth'})} }, 60);\n});\n\n/* ============ Mock（浏览器预览用） ============ */\nfunction mockState(){\n  var now=Date.now();\n  return {ok:true, gwBase:'http://127.0.0.1:9999', cfg:{strategy:'latency',staleMin:5,checkMin:10,gwToken:'sk-mh-8f3a91c4e77b2d06',timeoutMs:60000,overrideModel:true,slidingCheck:false},\n    providers:[\n      {id:'p1',name:'DeepSeek',type:'openai',base:'https://api.deepseek.com',keyMask:'sk-••••7f2a',ok:true,models:2,lastErr:''},\n      {id:'p2',name:'硅基流动',type:'openai',base:'https://api.siliconflow.cn',keyMask:'sk-••••91cd',ok:true,models:3,lastErr:''},\n      {id:'p3',name:'Groq',type:'openai',base:'https://api.groq.com/openai',keyMask:'gsk-••••k2m9',ok:false,models:1,lastErr:'401 Unauthorized'}\n    ],\n    models:[\n      {id:'p1::deepseek-chat',pid:'p1',pname:'DeepSeek',name:'deepseek-chat',alias:'',enabled:true,ok:true,lat:412,checkedAt:now-120000,hits:184,fails:2,err:''},\n      {id:'p1::deepseek-reasoner',pid:'p1',pname:'DeepSeek',name:'deepseek-reasoner',alias:'慢思考',enabled:true,ok:true,lat:1580,checkedAt:now-120000,hits:23,fails:0,err:''},\n      {id:'p2::Qwen/Qwen3-235B',pid:'p2',pname:'硅基流动',name:'Qwen/Qwen3-235B',alias:'qwen',enabled:true,ok:true,lat:366,checkedAt:now-180000,hits:96,fails:1,err:''},\n      {id:'p2::deepseek-ai/DeepSeek-V3',pid:'p2',pname:'硅基流动',name:'deepseek-ai/DeepSeek-V3',alias:'',enabled:true,ok:true,lat:890,checkedAt:now-180000,hits:41,fails:0,err:''},\n      {id:'p2::moonshotai/Kimi-K2',pid:'p2',pname:'硅基流动',name:'moonshotai/Kimi-K2',alias:'',enabled:false,ok:null,lat:0,checkedAt:0,hits:0,fails:0,err:''},\n      {id:'p3::llama-3.3-70b',pid:'p3',pname:'Groq',name:'llama-3.3-70b-versatile',alias:'',enabled:true,ok:false,lat:0,checkedAt:now-300000,hits:5,fails:9,err:'401 Unauthorized',cooldown:now+600000}\n    ],\n    stats:{total:6,enabled:5,healthy:4,providers:3,fastest:'qwen',fastestMs:366},\n    usage:{today:{p:3120,c:4180,t:7300,n:7},week:{p:41200,c:53100,t:94300,n:96},\n      month:{p:186000,c:241000,t:427000,n:412},total:{p:520000,c:680000,t:1200000,n:1180},\n      byDay:[{d:'11-09',t:21000,n:22},{d:'11-10',t:34000,n:31},{d:'11-11',t:18000,n:19},{d:'11-12',t:52000,n:48},\n             {d:'11-13',t:61000,n:55},{d:'11-14',t:28000,n:26},{d:'11-15',t:12000,n:11},{d:'11-16',t:44000,n:40},\n             {d:'11-17',t:73000,n:66},{d:'11-18',t:39000,n:35},{d:'11-19',t:25000,n:23},{d:'11-20',t:58000,n:52},\n             {d:'11-21',t:67000,n:60},{d:'11-22',t:7300,n:7}],\n      tops:[{id:'p2::Qwen/Qwen3-235B',name:'Qwen/Qwen3-235B',t:420000,n:380},\n            {id:'p1::deepseek-chat',name:'deepseek-chat',t:310000,n:290},\n            {id:'p1::deepseek-reasoner',name:'deepseek-reasoner',t:180000,n:150}]},\n    logs:[{t:now-60000,m:'[check] 6 个模型检测完成，4 可用'},{t:now-120000,m:'[route] 选中 p2::Qwen/Qwen3-235B 412ms'},{t:now-300000,m:'[check] p3::llama-3.3-70b 失败：401 Unauthorized'},{t:now-3600000,m:'[init] 面板启动'}]\n  };\n}\nfunction mockApi(path, body){\n  return new Promise(function(res){\n    setTimeout(function(){\n      var st = mockState();\n      if(path==='state') return res(st);\n      if(path==='model.patch'){ return res({ok:true}); }\n      if(path==='check'){ return res({ok:true,healthy:4,total:6}); }\n      if(path==='provider.add'){ return res({ok:true,pid:'p9',discovered:['deepseek-chat','deepseek-reasoner','deepseek-coder'],models:[]}); }\n      if(path==='provider.sync'){ return res({ok:true,discovered:['deepseek-chat','deepseek-reasoner','deepseek-coder','deepseek-v3'],models:['deepseek-chat']}); }\n      if(path==='model.add'){ return res({ok:true}); }\n      if(path==='cfg.set'){ return res({ok:true}); }\n      res({ok:true});\n    }, 220);\n  });\n}\n\n/* ============ 启动 ============ */\nload();\nsetInterval(function(){\n  var a = document.activeElement;\n  if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;  // 正在填表，不要刷\n  if ($('#picker') && $('#picker').classList.contains('on')) return;\n  load();\n}, 20000);\n</script>\n</body>\n</html>\n";
 
-// ===== 逻辑 =====
+// ===== 公共逻辑 =====
 /* ==========================================================================
  * ModelHub core —— 共享逻辑（被 panel / gateway / cron 三端复用）
  * 运行环境：Quantumult X 脚本引擎（JavaScriptCore）
@@ -511,6 +511,7 @@ var MH = (function () {
 })();
 
 
+// ===== 面板 =====
 /* ==========================================================================
  * ModelHub panel —— Quantumult X [http_backend] 处理器
  * 路径前缀 /mh/   →   http://127.0.0.1:9999/mh/
@@ -519,7 +520,7 @@ var MH = (function () {
  *   POST /mh/api/*       面板操作
  * ========================================================================== */
 
-(function () {
+function MH_PANEL() {
   var answered = false;
 
   function reply(obj) {
@@ -781,4 +782,393 @@ var MH = (function () {
   }
 
   return fail('未知操作 ' + action);
+}
+
+
+// ===== 网关 =====
+/* ==========================================================================
+ * ModelHub gateway —— OpenAI 兼容网关
+ * 路径前缀 /v1/  →  http://127.0.0.1:9999/v1
+ *   GET  /v1/models             模型清单（别名优先）
+ *   POST /v1/chat/completions   对话（自动路由）
+ *   POST /v1/completions        兼容旧接口
+ *   GET  /v1/health             运行状态
+ * ========================================================================== */
+
+function MH_GW() {
+  var answered = false;
+  function reply(obj) { if (answered) return; answered = true; $done(obj); }
+
+  function H(c) {
+    var h = { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'Connection': 'Close', 'Access-Control-Allow-Origin': '*' };
+    if (c) for (var k in c) h[k] = c[k];
+    return h;
+  }
+  function json(o, code) {
+    reply({ status: 'HTTP/1.1 ' + (code || 200) + ' OK', headers: H(), body: JSON.stringify(o) });
+  }
+  function oaiErr(msg, code, type) {
+    json({ error: { message: String(msg), type: type || 'gateway_error', code: code || null } }, code || 500);
+  }
+
+  setTimeout(function () {
+    if (!answered) oaiErr('网关超时（上游未在限定时间内返回）', 504, 'timeout');
+  }, 130000);
+
+  var rawPath = ($request.path || '/');
+  var qi = rawPath.indexOf('?');
+  var path = (qi >= 0 ? rawPath.slice(0, qi) : rawPath).replace(/\/+$/, '');
+  path = path.replace(/^\/v1(?=\/|$)/, '') || '/';
+  var method = ($request.method || 'GET').toUpperCase();
+
+  var st = MH.load();
+
+  /* ---------------- 鉴权 ---------------- */
+  var tok = String(st.cfg.gwToken || '').trim();
+  if (tok) {
+    var hd = $request.headers || {};
+    var got = hd['Authorization'] || hd['authorization'] || hd['x-api-key'] || hd['X-Api-Key'] || '';
+    got = String(got).replace(/^Bearer\s+/i, '').trim();
+    if (got !== tok) return oaiErr('Invalid API key', 401, 'invalid_request_error');
+  }
+
+  /* ---------------- 健康 ---------------- */
+  if (path === '/health' || path === '') {
+    var s = MH.stats(st);
+    return json({
+      ok: true, healthy: s.healthy, enabled: s.enabled, total: s.total,
+      strategy: st.cfg.strategy, fastest: s.fastest, fastestMs: s.fastestMs,
+      at: MH.now()
+    });
+  }
+
+  /* ---------------- 模型清单 ---------------- */
+  if (path === '/models' && method === 'GET') {
+    var data = [];
+    var seen = {};
+    for (var i = 0; i < st.models.length; i++) {
+      var m = st.models[i];
+      if (!m.enabled) continue;
+      if (!MH.pOf(st, m.pid)) continue;
+      var id = MH.publicName(m);
+      if (seen[id]) continue;
+      seen[id] = 1;
+      var p = MH.pOf(st, m.pid);
+      data.push({ id: id, object: 'model', created: 0, owned_by: p ? p.name : 'modelhub' });
+    }
+    return json({ object: 'list', data: data });
+  }
+
+  /* ---------------- 路由核心 ---------------- */
+  if (method === 'POST' && (path === '/chat/completions' || path === '/completions' || path === '/messages')) {
+    var reqObj = MH.reqJson($request.body);
+    if (!reqObj) return oaiErr('请求体不是合法 JSON', 400, 'invalid_request_error');
+
+    var want = reqObj.model || '';
+    var cands = MH.candidates(st, want);
+    if (!cands.length) {
+      return oaiErr('没有可用的模型：请先在 ModelHub 面板添加并启用模型', 503, 'no_available_model');
+    }
+
+    var ranked = MH.rank(st, cands);
+    var first = ranked[0];
+    var p0 = MH.pOf(st, first.pid);
+
+    // 覆盖 model：客户端随便填，统一用选中的真实模型名
+    var useName = first.name;
+    var outModel = want || MH.publicName(first);
+
+    var up = buildUpstream(p0, first, reqObj, useName);
+    if (up.err) return oaiErr(up.err, 400, 'invalid_request_error');
+
+    var t0 = MH.now();
+
+    $task.fetch({ url: up.url, method: 'POST', headers: MH.authHeaders(p0), body: up.body }).then(function (r) {
+      var lat = MH.now() - t0;
+      var st2 = MH.load();
+      var m2 = findModel(st2, first.id);
+
+      if (r.statusCode < 200 || r.statusCode >= 300) {
+        if (m2) { MH.applyProbe(st2, m2, 'HTTP ' + r.statusCode, lat); }
+        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 失败 HTTP ' + r.statusCode + ' (' + lat + 'ms)');
+        bump(st2, m2);
+        MH.save(st2);
+        return oaiErr(MH.errText(r.statusCode, r.body), r.statusCode, 'upstream_error');
+      }
+
+      var payload = toOpenAI(p0, r.body, outModel, useName);
+      if (!payload) {
+        if (m2) MH.applyProbe(st2, m2, '上游返回无法解析', lat);
+        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 返回无法解析');
+        bump(st2, m2);
+        MH.save(st2);
+        return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
+      }
+
+      // 记一笔 token 用量
+      var tk = (payload.usage && payload.usage.total_tokens) || 0;
+      MH.recordUsage(st2, first.id, payload.usage || {});
+
+      if (m2) { m2.ok = true; m2.err = ''; m2.fails = 0; m2.cooldown = 0; m2.lat = lat; m2.checkedAt = MH.now(); }
+      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms · ' + tk + 'tk');
+      bump(st2, m2);
+      MH.save(st2);
+
+      if (reqObj.stream) return sse(payload, outModel);
+      json(payload);
+    }, function (e) {
+      var st3 = MH.load();
+      var m3 = findModel(st3, first.id);
+      var msg = (e && e.error) || '网络错误';
+      if (m3) MH.applyProbe(st3, m3, msg, MH.now() - t0);
+      MH.log(st3, '[gw] ' + p0.name + '/' + useName + ' 异常: ' + msg);
+      bump(st3, m3);
+      MH.save(st3);
+      oaiErr('上游连接失败：' + msg, 502, 'upstream_unreachable');
+    });
+    return;
+  }
+
+  return oaiErr('Not found: ' + path, 404, 'invalid_request_path');
+
+  /* ==================== 工具 ==================== */
+
+  function findModel(s, id) {
+    for (var i = 0; i < s.models.length; i++) if (s.models[i].id === id) return s.models[i];
+    return null;
+  }
+  function bump(s, m) {
+    if (!m) return;
+    if (MH.now() - (s.t || 0) > 20000) { m.hits = (m.hits || 0) + 1; s.t = MH.now(); }
+  }
+
+  /* 把 OpenAI 风格请求体转换成目标提供商格式 */
+  function buildUpstream(p, m, src, modelName) {
+    var msgs = src.messages || [];
+    if (src.prompt && !msgs.length) msgs = [{ role: 'user', content: src.prompt }];
+    if (!msgs.length) return { err: 'messages 为空' };
+
+    var maxTok = src.max_tokens || src.max_completion_tokens || 1024;
+    var temp = (src.temperature === undefined) ? undefined : src.temperature;
+
+    if (p.type === 'anthropic') {
+      var sys = '';
+      var am = [];
+      for (var i = 0; i < msgs.length; i++) {
+        var r = msgs[i].role;
+        var c = flatten(msgs[i].content);
+        if (r === 'system') { sys += (sys ? '\n' : '') + c; continue; }
+        am.push({ role: r === 'assistant' ? 'assistant' : 'user', content: c });
+      }
+      var ab = { model: modelName, max_tokens: maxTok, messages: am };
+      if (sys) ab.system = sys;
+      if (temp !== undefined) ab.temperature = temp;
+      return { url: MH.urlChat(p), body: JSON.stringify(ab) };
+    }
+
+    if (p.type === 'gemini') {
+      var contents = [], gsys = '';
+      for (var j = 0; j < msgs.length; j++) {
+        var r2 = msgs[j].role;
+        var c2 = flatten(msgs[j].content);
+        if (r2 === 'system') { gsys += (gsys ? '\n' : '') + c2; continue; }
+        contents.push({ role: r2 === 'assistant' ? 'model' : 'user', parts: [{ text: c2 }] });
+      }
+      var gb = { contents: contents, generationConfig: { maxOutputTokens: maxTok } };
+      if (gsys) gb.systemInstruction = { parts: [{ text: gsys }] };
+      if (temp !== undefined) gb.generationConfig.temperature = temp;
+      return { url: MH.urlGemini(p, modelName), body: JSON.stringify(gb) };
+    }
+
+    // openai 兼容：原样透传，只换 model / 关流
+    var ob = {};
+    for (var k in src) ob[k] = src[k];
+    ob.model = modelName;
+    ob.stream = false;
+    if (!ob.max_tokens && !ob.max_completion_tokens) ob.max_tokens = maxTok;
+    delete ob.stream_options;
+    return { url: MH.urlChat(p), body: JSON.stringify(ob) };
+  }
+
+  function flatten(c) {
+    if (c === null || c === undefined) return '';
+    if (typeof c === 'string') return c;
+    if (Array.isArray(c)) {
+      var s = '';
+      for (var i = 0; i < c.length; i++) {
+        var x = c[i];
+        if (typeof x === 'string') s += x;
+        else if (x && x.text) s += x.text;
+        else if (x && x.type === 'image_url') s += '[image]';
+      }
+      return s;
+    }
+    if (c.text) return c.text;
+    return String(c);
+  }
+
+  /* 上游响应 → OpenAI 格式 */
+  function toOpenAI(p, body, outModel, realName) {
+    var j;
+    try { j = JSON.parse(body); } catch (e) { return null; }
+
+    var text = MH.extractText(p, j);
+    var usage = j.usage || {};
+
+    var mapped = {
+      provider: p.type === 'gemini' ? 'google' : (p.type === 'anthropic' ? 'anthropic' : 'openai'),
+      client_id: 'modelhub',
+      upstream: p.name
+    };
+
+    var outUsage = {
+      prompt_tokens: usage.prompt_tokens || usage.input_tokens || 0,
+      completion_tokens: usage.completion_tokens || usage.output_tokens || 0,
+      total_tokens: usage.total_tokens ||
+        ((usage.prompt_tokens || usage.input_tokens || 0) + (usage.completion_tokens || usage.output_tokens || 0))
+    };
+
+    if (p.type === 'openai') {
+      // 原样返回，仅统一 model 字段
+      if (j.model !== undefined) j.model = outModel;
+      if (!j.usage) j.usage = outUsage;
+      j['x_modelhub'] = mapped;
+      return j;
+    }
+
+    var finish = 'stop';
+    if (p.type === 'anthropic') {
+      if (j.stop_reason === 'max_tokens') finish = 'length';
+    } else if (p.type === 'gemini') {
+      var fr = ((j.candidates || [])[0] || {}).finishReason;
+      if (fr === 'MAX_TOKENS') finish = 'length';
+      else if (fr === 'SAFETY') finish = 'content_filter';
+    }
+
+    var id = 'chatcmpl-mh-' + Math.random().toString(36).slice(2, 12);
+    return {
+      id: id,
+      object: 'chat.completion',
+      created: Math.floor(MH.now() / 1000),
+      model: outModel,
+      choices: [{
+        index: 0,
+        message: { role: 'assistant', content: text },
+        finish_reason: finish
+      }],
+      usage: outUsage,
+      'x_modelhub': mapped
+    };
+  }
+
+  /* 非流式结果 → 一次 SSE 输出（客户端仍按流式解析，不会报错） */
+  function sse(payload, outModel) {
+    var ch = (payload.choices || [{}])[0] || {};
+    var msg = ch.message || {};
+    var content = msg.content || '';
+    var id = payload.id || ('chatcmpl-mh-' + Math.random().toString(36).slice(2, 12));
+    var created = payload.created || Math.floor(MH.now() / 1000);
+
+    function chunk(delta, finish) {
+      return 'data: ' + JSON.stringify({
+        id: id, object: 'chat.completion.chunk', created: created, model: outModel,
+        choices: [{ index: 0, delta: delta, finish_reason: finish || null }]
+      }) + '\n\n';
+    }
+
+    var body = chunk({ role: 'assistant', content: '' });
+    // 分段发出，避免个别客户端对超长单块处理异常
+    var STEP = 480;
+    for (var i = 0; i < content.length; i += STEP) {
+      body += chunk({ content: content.slice(i, i + STEP) });
+    }
+    body += chunk({}, ch.finish_reason || 'stop');
+    body += 'data: [DONE]\n\n';
+
+    reply({
+      status: 'HTTP/1.1 200 OK',
+      headers: H({ 'Content-Type': 'text/event-stream; charset=utf-8', 'X-Accel-Buffering': 'no' }),
+      body: body
+    });
+  }
+}
+
+
+// ===== 探活 =====
+/* ==========================================================================
+ * ModelHub cron —— 定时探活（[task_local]）
+ * 把每个已启用模型的延迟/成败写进 $prefs，供网关零网络秒选。
+ * ========================================================================== */
+
+function MH_CRON() {
+  function done() { try { $done(); } catch (e) { } }
+
+  var st = MH.load();
+  var mode = st.cfg.checkMode || 'ping';
+
+  var list = [];
+  for (var i = 0; i < st.models.length; i++) {
+    var m = st.models[i];
+    if (!m.enabled) continue;
+    if (!MH.pOf(st, m.pid)) continue;
+    list.push({ id: m.id, pid: m.pid, name: m.name });
+  }
+
+  if (!list.length) {
+    MH.log(st, '[cron] 没有已启用的模型，跳过');
+    MH.save(st);
+    return done();
+  }
+
+  var results = {};
+  var idx = 0, running = 0, doneN = 0;
+  var LIMIT = 4;
+  var before = MH.stats(st);
+
+  function finish() {
+    var s2 = MH.load();
+    for (var j = 0; j < s2.models.length; j++) {
+      var mm = s2.models[j];
+      var r = results[mm.id];
+      if (!r) continue;
+      MH.applyProbe(s2, mm, r.err, r.lat);
+    }
+    var after = MH.stats(s2);
+    MH.log(s2, '[cron] ' + list.length + ' 个模型探活完成，' + after.healthy + ' 可用');
+
+    // 全部挂掉才通知，避免打扰
+    if (after.healthy === 0 && before.healthy > 0) {
+      try { $notify('ModelHub', '所有模型都不可用', '请打开面板检查 Key 或网络'); } catch (e) { }
+    }
+    MH.save(s2);
+    done();
+  }
+
+  function next() {
+    if (doneN >= list.length) return finish();
+    if (running >= LIMIT || idx >= list.length) return;
+    var task = list[idx++];
+    running++;
+    (function (task) {
+      var p = MH.pOf(st, task.pid);
+      if (!p) { results[task.id] = { err: '提供商已删除', lat: 0 }; running--; doneN++; return next(); }
+      MH.probe(p, task.name, mode, function (err, lat) {
+        results[task.id] = { err: err || '', lat: lat || 0 };
+        running--; doneN++;
+        next();
+      });
+    })(task);
+    next();
+  }
+
+  next();
+}
+
+// ===== 分发：面板 / 网关 / 定时任务共用一个文件 =====
+(function () {
+  var hasReq = (typeof $request !== 'undefined') && $request && $request.path;
+  if (!hasReq) { return MH_CRON(); }
+  var p = String($request.path || '');
+  if (/^\/v1(\/|$)/.test(p)) return MH_GW();
+  return MH_PANEL();
 })();

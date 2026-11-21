@@ -33,13 +33,13 @@ panel_out = BANNER % ts + \
     "// ===== 面板 UI（内联 HTML）=====\n" \
     "var MH_VER_ = " + json.dumps(VER) + ";\n" \
     "var MH_HTML_ = " + json.dumps(ui, ensure_ascii=False) + ";\n\n" \
-    "// ===== 逻辑 =====\n" + core + "\n\n" + panel
+    "// ===== 逻辑 =====\n" + core + "\n\n" + panel + "\n\nMH_PANEL();\n"
 
 # ---------- 2. 网关 ----------
-gw_out = BANNER % ts + "// ===== 逻辑 =====\n" + core + "\n\n" + gw
+gw_out = BANNER % ts + "// ===== 逻辑 =====\n" + core + "\n\n" + gw + "\n\nMH_GW();\n"
 
 # ---------- 3. 定时任务 ----------
-cron_out = BANNER % ts + "// ===== 逻辑 =====\n" + core + "\n\n" + cron
+cron_out = BANNER % ts + "// ===== 逻辑 =====\n" + core + "\n\n" + cron + "\n\nMH_CRON();\n"
 
 def w(name, s):
     p = os.path.join(OUT, name)
@@ -47,7 +47,27 @@ def w(name, s):
         f.write(s)
     print('%-22s %7d bytes' % (name, len(s.encode('utf-8'))))
 
-w('modelhub.js', panel_out)
+w('modelhub-panel.js', panel_out)
 w('modelhub-gw.js', gw_out)
 w('modelhub-cron.js', cron_out)
+
+dispatch = '''
+// ===== 分发：面板 / 网关 / 定时任务共用一个文件 =====
+(function () {
+  var hasReq = (typeof $request !== 'undefined') && $request && $request.path;
+  if (!hasReq) { return MH_CRON(); }
+  var p = String($request.path || '');
+  if (/^\\/v1(\\/|$)/.test(p)) return MH_GW();
+  return MH_PANEL();
+})();
+'''
+all_out = BANNER % ts + \
+    "// ===== 面板 UI（内联 HTML）=====\n" \
+    "var MH_VER_ = " + json.dumps(VER) + ";\n" \
+    "var MH_HTML_ = " + json.dumps(ui, ensure_ascii=False) + ";\n\n" \
+    "// ===== 公共逻辑 =====\n" + core + "\n\n" \
+    "// ===== 面板 =====\n" + panel + "\n\n" \
+    "// ===== 网关 =====\n" + gw + "\n\n" \
+    "// ===== 探活 =====\n" + cron + dispatch
+w('modelhub.js', all_out)
 print('OK')

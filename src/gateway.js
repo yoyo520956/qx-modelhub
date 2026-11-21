@@ -7,7 +7,7 @@
  *   GET  /v1/health             运行状态
  * ========================================================================== */
 
-(function () {
+function MH_GW() {
   var answered = false;
   function reply(obj) { if (answered) return; answered = true; $done(obj); }
 
@@ -303,4 +303,4 @@
       body: body
     });
   }
-})();
+}

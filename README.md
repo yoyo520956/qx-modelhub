@@ -28,32 +28,29 @@ ModelHub 是把同样的核心能力塞进 **QX 的 `[http_backend]`**——那�
 
 ### 1. 放脚本
 
-三个文件：
+只需要**一个文件** `modelhub.js`——面板、网关、定时探活都在里面，脚本按请求路径自动分发。
 
-- `modelhub.js` — 面板（UI + 配置 API）
-- `modelhub-gw.js` — 网关（OpenAI 兼容）
-- `modelhub-cron.js` — 定时探活
-
-**方式 A（推荐，不依赖网络）**：放进
+**方式 A（推荐，完全不联网）**：把 `modelhub.js` 放进
 「iCloud Drive → Quantumult X → Scripts」
 或「我的 iPhone → Quantumult X → Scripts」
 
-**方式 B**：直接用本仓库的 raw 地址（脚本更新会自动生效，但需要能访问 raw.githubusercontent.com）。
+**方式 B**：直接用本仓库的 raw / jsDelivr 地址（能自动更新，但依赖网络可达）。
 
 ### 2. 加配置
 
-把 [`QX-modelhub.conf`](QX-modelhub.conf) 粘进 QX 配置文件，或新建 `ModelHub.conf` 导入。核心就三行：
+把 [`QX-modelhub.conf`](QX-modelhub.conf) 粘进 QX 配置文件，或新建 `ModelHub.conf` 导入。核心就两行：
 
 ```ini
 [http_backend]
-https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js, tag=ModelHub面板, path=^/mh/, enabled=true
-https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub-gw.js, tag=ModelHub网关, path=^/v1/, enabled=true
+https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js, tag=ModelHub, path=^/(mh|v1), enabled=true
 
 [task_local]
-*/10 * * * * https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub-cron.js, tag=ModelHub探活, enabled=true
+*/10 * * * * https://raw.githubusercontent.com/yoyo520956/qx-modelhub/main/modelhub.js, tag=ModelHub-Cron, enabled=true
 ```
 
-用方式 A 的话，把上面三条的 URL 换成裸文件名（`modelhub.js` 这样）。
+用方式 A（本地文件）的话，把 URL 换成裸文件名 `modelhub.js`。
+
+> 也可以一键导入：点 `deeplink-raw.txt` 里那条 `quantumult-x:///...` 链接，QX 会自动添加这两个资源。`deeplink-jsdelivr.txt` 是 CDN 版。
 
 ### 3. 打开面板
 
@@ -91,17 +88,15 @@ http://127.0.0.1:9999/mh/api/ping
 
 ### 5. 最稳的装法：本地文件（完全不联网）
 
-1. 下载三个文件 → 放进「iCloud Drive → Quantumult X → Scripts」
-   - `modelhub.js`、`modelhub-gw.js`、`modelhub-cron.js`
+1. 下载 `modelhub.js` → 放进「iCloud Drive → Quantumult X → Scripts」
 2. 配置里用裸文件名（官方 sample 确认支持这种写法）：
 
 ```ini
 [http_backend]
-modelhub.js, tag=ModelHub-Panel, path=^/mh/, enabled=true
-modelhub-gw.js, tag=ModelHub-GW, path=^/v1/, enabled=true
+modelhub.js, tag=ModelHub, path=^/(mh|v1), enabled=true
 
 [task_local]
-*/10 * * * * modelhub-cron.js, tag=ModelHub-Cron, enabled=true
+*/10 * * * * modelhub.js, tag=ModelHub-Cron, enabled=true
 ```
 
 这条路一劳永逸：不依赖任何 CDN，QX 更新脚本也不需要重新下载。
@@ -210,12 +205,12 @@ API Key : 面板「路由」页里那个网关 Key
 
 ```
 src/
-  core.js      状态、探测、路由算法（三端共用）
+  core.js      状态、探测、路由算法、Token 统计（三端共用）
   panel.js     面板 API 处理器
   gateway.js   OpenAI 兼容网关
   cron.js      定时探活
-  ui.html      面板前端（单独写，构建时内联进 panel）
-build.py       生成 out/ 下三个 QX 脚本
+  ui.html      面板前端（单独写，构建时内联）
+build.py       生成 out/modelhub.js（合并单文件）+ 三个分体版
 test/run.js    Node 端到端沙盒（模拟 QX 环境 + 假上游）
 ```
 

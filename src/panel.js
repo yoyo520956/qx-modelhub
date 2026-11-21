@@ -6,7 +6,7 @@
  *   POST /mh/api/*       面板操作
  * ========================================================================== */
 
-(function () {
+function MH_PANEL() {
   var answered = false;
 
   function reply(obj) {
@@ -268,4 +268,4 @@
   }
 
   return fail('未知操作 ' + action);
-})();
+}

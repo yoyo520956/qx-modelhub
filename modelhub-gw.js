@@ -1,6 +1,6 @@
 /*!
  * ModelHub — Quantumult X 本地模型路由
- * 生成时间: 2026-11-22 02:32
+ * 生成时间: 2026-11-22 02:43
  * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
  */
 // ===== 逻辑 =====
@@ -516,7 +516,7 @@ var MH = (function () {
  *   GET  /v1/health             运行状态
  * ========================================================================== */
 
-(function () {
+function MH_GW() {
   var answered = false;
   function reply(obj) { if (answered) return; answered = true; $done(obj); }
 
@@ -812,4 +812,7 @@ var MH = (function () {
       body: body
     });
   }
-})();
+}
+
+
+MH_GW();

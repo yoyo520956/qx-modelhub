@@ -145,9 +145,9 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   const upG = await startUpstream(8813, 'gemini');
 
   store = {}; persist();
-  const PANEL = path.join(OUT, 'modelhub.js');
-  const GW = path.join(OUT, 'modelhub-gw.js');
-  const CRON = path.join(OUT, 'modelhub-cron.js');
+  // 全部用「合并单文件」测试，验证分发器
+  const ALL = path.join(OUT, 'modelhub.js');
+  const PANEL = ALL, GW = ALL, CRON = ALL;
 
   console.log('\n【1】面板：添加提供商 + 自动拉模型');
   let r = await installQX(mkReq('/mh/api/provider.add', 'POST', {
@@ -317,7 +317,8 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   stObj.models.forEach(m => { m.enabled = true; m.ok = null; m.checkedAt = 0; });
   stObj.models.forEach(m => { if (m.name === 'gamma-dead') m.enabled = false; });
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
-  r = await installQX({ url: 'http://x/cron', path: '/cron', method: 'GET', headers: {} }, { file: CRON });
+  // 定时任务里 QX 不提供 $request，传 undefined 模拟真实环境
+  r = await installQX(undefined, { file: CRON });
   stObj = JSON.parse(store['modelhub.state.v1']);
   const checked = stObj.models.filter(m => m.checkedAt > 0).length;
   ok(checked === 4, 'cron 检查了 4 个启用模型', { checked });
