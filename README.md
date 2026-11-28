@@ -4,7 +4,7 @@
 
 不需要服务器、不需要 Docker、不需要电脑。**没有一行代码跑在云端。**
 
-> **v1.2.0 换了架构**：不再依赖 `http_backend`（实测在部分设备上 9999 端口起不来），改为纯 `rewrite` 实现——面板用 `script-echo-response` 本地应答，路由用 `script-request-header` 改写 upstream。副作用是好的：**流式是真的了**，QX 按改写后的地址原生转发，不是攒完再吐。
+> **v1.2.4 换了架构**：不再依赖 `http_backend`（实测在部分设备上 9999 端口起不来），改为纯 `rewrite` 实现——面板用 `script-echo-response` 本地应答，路由用 `script-request-header` 改写 upstream。副作用是好的：**流式是真的了**，QX 按改写后的地址原生转发，不是攒完再吐。
 
 ---
 
