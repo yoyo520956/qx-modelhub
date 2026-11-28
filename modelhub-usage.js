@@ -1,0 +1,623 @@
+/*!
+ * ModelHub v1.2.3 — Quantumult X 本地模型路由（rewrite 架构，不需要本地服务器）
+ * 生成时间: 2026-11-28 08:00
+ * 本文件由 build.py 自动生成，请勿直接编辑；改 src/ 后重新构建。
+ */
+var MH_VER_ = "1.2.3";
+// ===== 公共逻辑 =====
+/* ==========================================================================
+ * ModelHub core —— 共享逻辑（被 panel / gateway / cron 三端复用）
+ * 运行环境：Quantumult X 脚本引擎（JavaScriptCore）
+ * 持久化：$prefs 单个 JSON 字符串
+ * ========================================================================== */
+var MH = (function () {
+  var KEY = 'modelhub.state.v1';
+  // Agnes 密钥（base64 解码后的 sk- 值）
+  var KEY_AGNES = 'sk-XaGjXJS77FniRVmacdbsfUwf1OR4wtUxTSNtCFg4cV1HeS82';
+  var MAXLOG = 200;
+
+  function now() { return Date.now(); }
+
+  function dflt() {
+    return {
+      v: 1, t: 0,
+      providers: [],
+      models: [],
+      cfg: {
+        strategy: 'latency', staleMin: 5, checkMin: 10,
+        gwToken: '', timeoutMs: 60000, overrideModel: true, slidingCheck: false,
+        checkMode: 'ping'
+      },
+      usage: null,
+      logs: []
+    };
+  }
+
+  function migrate(o) {
+    var d = dflt();
+    o = o || {};
+    o.v = o.v || 1;
+    o.providers = o.providers || [];
+    o.models = o.models || [];
+    o.logs = o.logs || [];
+    o.t = o.t || 0;
+    var c = o.cfg || {};
+    for (var k in d.cfg) if (c[k] === undefined) c[k] = d.cfg[k];
+    o.cfg = c;
+    if (!o.usage || !o.usage.days) o.usage = { days: {}, models: {}, total: { p: 0, c: 0, t: 0, n: 0 } };
+    return o;
+  }
+
+
+  /* ===== Agnes 预置（每次 load 自动注入，幂等）=====
+   * base 用 /v1（ModelHub 会拼 /models 与 /chat/completions）
+   * key 为 base64 解码后的真实 sk- 密钥
+   * 预置 4 个纯文本 chat 模型；image/video 走面板「刷新模型」手动勾选
+   */
+  var AGNES = {
+    id: 'p_agnes', name: 'Agnes 2.0', type: 'openai',
+    base: 'https://api.agnes-ai.cn/v1',
+    key: KEY_AGNES
+  };
+  var AGNES_CHAT = ['agnes-3.0-flash','agnes-2.5-flash','agnes-2.5-pro','agnes-3.0-pro'];
+
+  function seedAgnes(st) {
+    var p = null;
+    for (var i = 0; i < st.providers.length; i++) if (st.providers[i].id === AGNES.id) { p = st.providers[i]; break; }
+    if (!p) {
+      p = { id: AGNES.id, name: AGNES.name, type: AGNES.type, base: AGNES.base, key: AGNES.key,
+            ok: null, lastErr: '', lastSync: 0, added: now() };
+      st.providers.push(p);
+    }
+    // key 可能因升级而更新，始终同步
+    p.key = AGNES.key;
+    var have = {};
+    for (var m = 0; m < st.models.length; m++) have[st.models[m].id] = 1;
+    for (var w = 0; w < AGNES_CHAT.length; w++) {
+      var mid = AGNES.id + '::' + AGNES_CHAT[w];
+      if (!have[mid]) st.models.push({
+        id: mid, pid: AGNES.id, name: AGNES_CHAT[w], alias: '', enabled: true,
+        ok: null, lat: 0, checkedAt: 0, err: '', cooldown: 0, hits: 0, fails: 0, w: 1, p: 0, added: now()
+      });
+    }
+  }
+
+  function load() {
+    var st;
+    try {
+      var s = $prefs.valueForKey(KEY);
+      st = s ? migrate(JSON.parse(s)) : dflt();
+    } catch (e) { st = dflt(); }
+    seedAgnes(st);
+    return st;
+  }
+
+  function save(st) {
+    try {
+      if (st.logs && st.logs.length > MAXLOG) st.logs = st.logs.slice(-MAXLOG);
+      return $prefs.setValueForKey(JSON.stringify(st), KEY);
+    } catch (e) { return false; }
+  }
+
+  function log(st, msg) {
+    st.logs = st.logs || [];
+    st.logs.push({ t: now(), m: String(msg) });
+    if (st.logs.length > MAXLOG) st.logs = st.logs.slice(-MAXLOG);
+  }
+
+  function uid(pfx) {
+    return pfx + Math.random().toString(36).slice(2, 8) + now().toString(36).slice(-3);
+  }
+
+  function mask(k) {
+    if (!k) return '—';
+    if (k.length <= 8) return k.slice(0, 2) + '••••';
+    return k.slice(0, 4) + '••••' + k.slice(-4);
+  }
+
+  function trimBase(b) {
+    return String(b || '').trim().replace(/\/+$/, '');
+  }
+
+  function pOf(st, pid) {
+    for (var i = 0; i < st.providers.length; i++) if (st.providers[i].id === pid) return st.providers[i];
+    return null;
+  }
+
+  /* ---------- URL 构造 ---------- */
+  function urlModels(p) {
+    var b = trimBase(p.base);
+    if (p.type === 'gemini') return b + '/models?key=' + encodeURIComponent(p.key);
+    return b + '/models';
+  }
+
+  function urlChat(p) {
+    var b = trimBase(p.base);
+    if (p.type === 'anthropic') return b + '/messages';
+    if (p.type === 'gemini') return b; // 单独拼
+    return b + '/chat/completions';
+  }
+
+  function urlGemini(p, model) {
+    return trimBase(p.base) + '/models/' + encodeURIComponent(model) +
+      ':generateContent?key=' + encodeURIComponent(p.key);
+  }
+
+  /* ---------- 请求头 ---------- */
+  function authHeaders(p) {
+    var h = { 'Content-Type': 'application/json' };
+    if (p.type === 'anthropic') {
+      h['x-api-key'] = p.key;
+      h['anthropic-version'] = '2023-06-01';
+    } else if (p.type === 'gemini') {
+      h['x-goog-api-key'] = p.key;
+    } else {
+      h['Authorization'] = 'Bearer ' + p.key;
+    }
+    return h;
+  }
+
+  /* ---------- 请求体 ---------- */
+  function bodyChat(p, model, promptTxt, maxTok) {
+    if (p.type === 'anthropic') {
+      return JSON.stringify({
+        model: model, max_tokens: maxTok || 1,
+        messages: [{ role: 'user', content: promptTxt || 'hi' }]
+      });
+    }
+    if (p.type === 'gemini') {
+      return JSON.stringify({
+        contents: [{ parts: [{ text: promptTxt || 'hi' }] }],
+        generationConfig: { maxOutputTokens: maxTok || 1 }
+      });
+    }
+    return JSON.stringify({
+      model: model, max_tokens: maxTok || 1, stream: false,
+      messages: [{ role: 'user', content: promptTxt || 'hi' }]
+    });
+  }
+
+  /* ---------- 轻量 base64 ---------- */
+  var B64C = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+  function fromB64(s) {
+    s = String(s).replace(/[\r\n\s]/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    var out = '', i = 0;
+    while (i < s.length) {
+      var e1 = B64C.indexOf(s.charAt(i++));
+      var e2 = B64C.indexOf(s.charAt(i++));
+      var e3 = B64C.indexOf(s.charAt(i++));
+      var e4 = B64C.indexOf(s.charAt(i++));
+      out += String.fromCharCode((e1 << 2) | (e2 >> 4));
+      if (e3 > -1) out += String.fromCharCode(((e2 & 15) << 4) | (e3 >> 2));
+      if (e4 > -1) out += String.fromCharCode(((e3 & 3) << 6) | e4);
+    }
+    // UTF-8 -> string
+    try { return decodeURIComponent(escape(out)); } catch (e) { return out; }
+  }
+
+  // 从 $request 里拿 JSON 对象（兼容明文 / base64）
+  function reqJson(raw) {
+    if (!raw) return null;
+    if (typeof raw === 'object') return raw;
+    try { return JSON.parse(raw); } catch (e) { }
+    try { return JSON.parse(fromB64(raw)); } catch (e) { }
+    return null;
+  }
+
+  /* ---------- 解析上游响应 ---------- */
+  function parseModels(p, body) {
+    var out = [];
+    try {
+      var j = JSON.parse(body);
+      if (p.type === 'gemini') {
+        var arr = j.models || [];
+        for (var i = 0; i < arr.length; i++) {
+          var n = arr[i].name || '';
+          n = n.replace(/^models\//, '');
+          var methods = arr[i].supportedGenerationMethods || [];
+          if (methods.length && methods.indexOf('generateContent') < 0) continue;
+          if (n) out.push(n);
+        }
+      } else {
+        var d = j.data || j.models || j;
+        if (Array.isArray(d)) {
+          for (var k = 0; k < d.length; k++) {
+            var id = d[k].id || d[k].name || d[k].model;
+            if (id) out.push(String(id).replace(/^models\//, ''));
+          }
+        }
+      }
+    } catch (e) { }
+    return out;
+  }
+
+  /* ---------- 结果提取（统一成文本） ---------- */
+  function extractText(p, j) {
+    if (!j) return '';
+    if (p.type === 'anthropic') {
+      var c = j.content || [];
+      var s = '';
+      for (var i = 0; i < c.length; i++) if (c[i].text) s += c[i].text;
+      return s;
+    }
+    if (p.type === 'gemini') {
+      var cands = j.candidates || [];
+      if (!cands.length) return '';
+      var parts = (cands[0].content || {}).parts || [];
+      var t = '';
+      for (var k = 0; k < parts.length; k++) if (parts[k].text) t += parts[k].text;
+      return t;
+    }
+    var ch = j.choices || [];
+    if (ch.length && ch[0].message) return ch[0].message.content || '';
+    return '';
+  }
+
+  function errText(status, body) {
+    var t = '';
+    try {
+      var j = JSON.parse(body);
+      t = (j.error && (j.error.message || j.error.code)) || j.message || j.msg || '';
+    } catch (e) { t = ''; }
+    if (!t) t = String(body || '').slice(0, 120);
+    return 'HTTP ' + status + (t ? ' · ' + t : '');
+  }
+
+  /* ---------- 模型发现 ---------- */
+  // cb(err, models[])
+  function discover(p, cb) {
+    var req = { url: urlModels(p), method: 'GET', headers: authHeaders(p) };
+    $task.fetch(req).then(function (r) {
+      if (r.statusCode !== 200) return cb(errText(r.statusCode, r.body));
+      var ms = parseModels(p, r.body);
+      if (!ms.length) return cb('接口返回 200 但没有模型字段');
+      cb(null, ms);
+    }, function (e) { cb('连接失败: ' + ((e && e.error) || '未知')); });
+  }
+
+  /* ---------- 健康探测 ---------- */
+  // cb(err, latencyMs)
+  function probe(p, model, mode, cb) {
+    var t0 = now();
+    if (mode === 'models') {
+      var req0 = { url: urlModels(p), method: 'GET', headers: authHeaders(p) };
+      $task.fetch(req0).then(function (r) {
+        if (r.statusCode !== 200) return cb(errText(r.statusCode, r.body), 0);
+        var ms = parseModels(p, r.body);
+        if (ms.length && ms.indexOf(model) < 0) return cb('列表里没有这个模型', 0);
+        cb(null, now() - t0);
+      }, function (e) { cb('连接失败: ' + ((e && e.error) || '未知'), 0); });
+      return;
+    }
+    var url = (p.type === 'gemini') ? urlGemini(p, model) : urlChat(p);
+    var req = { url: url, method: 'POST', headers: authHeaders(p), body: bodyChat(p, model, 'hi', 1) };
+    $task.fetch(req).then(function (r) {
+      var lat = now() - t0;
+      if (r.statusCode >= 200 && r.statusCode < 300) return cb(null, lat);
+      cb(errText(r.statusCode, r.body), lat);
+    }, function (e) { cb('连接失败: ' + ((e && e.error) || '未知'), now() - t0); });
+  }
+
+  /* ---------- 记录探测结果 ---------- */
+  function applyProbe(st, m, err, lat) {
+    m.checkedAt = now();
+    if (err) {
+      m.ok = false; m.err = err; m.fails = (m.fails || 0) + 1;
+      m.lat = 999999; // 失败模型排到最后，避免"全坏"时又被优先"
+      m.failAt = now();
+      // 首次失败即冷却，指数退避 30s→60s→120s…上限 30 分钟
+      var cool = Math.min(1800000, 30000 * Math.pow(2, Math.min(6, m.fails - 1)));
+      m.cooldown = now() + cool;
+    } else {
+      m.ok = true; m.err = ''; m.fails = 0; m.cooldown = 0; m.lat = lat || 0;
+    }
+  }
+
+  /* ---------- Token 用量统计 ---------- */
+  function zero() { return { p: 0, c: 0, t: 0, n: 0 }; }
+
+  function dayKey(t) {
+    var d = new Date(t === undefined ? now() : t);
+    var m = d.getMonth() + 1, dd = d.getDate();
+    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (dd < 10 ? '0' + dd : dd);
+  }
+
+  function addU(a, b) {
+    a.p += b.p || 0; a.c += b.c || 0; a.t += b.t || 0; a.n += b.n || 0;
+    return a;
+  }
+
+  // 一次请求记一笔
+  function recordUsage(st, mid, u) {
+    if (!st.usage || !st.usage.days) st.usage = { days: {}, models: {}, total: zero() };
+    u = u || {};
+    var p = u.prompt_tokens || 0, c = u.completion_tokens || 0;
+    var t = u.total_tokens || (p + c);
+    if (!p && !c && !t) return false;
+    var rec = { p: p, c: c, t: t, n: 1 };
+    var k = dayKey();
+    st.usage.days[k] = addU(st.usage.days[k] || zero(), rec);
+    if (mid) st.usage.models[mid] = addU(st.usage.models[mid] || zero(), rec);
+    st.usage.total = addU(st.usage.total || zero(), rec);
+    // 只留最近 120 天
+    var keys = Object.keys(st.usage.days).sort();
+    while (keys.length > 120) delete st.usage.days[keys.shift()];
+    return true;
+  }
+
+  function sumDays(st, n) {
+    var out = zero(), days = (st.usage && st.usage.days) || {};
+    for (var i = 0; i < n; i++) {
+      var d = days[dayKey(now() - i * 86400000)];
+      if (d) addU(out, d);
+    }
+    return out;
+  }
+
+  function usageStats(st) {
+    var u = st.usage || { days: {}, models: {}, total: zero() };
+    var byDay = [];
+    for (var i = 13; i >= 0; i--) {
+      var k = dayKey(now() - i * 86400000);
+      var d = u.days[k] || zero();
+      byDay.push({ d: k.slice(5), t: d.t, n: d.n });
+    }
+    var tops = [];
+    for (var id in (u.models || {})) {
+      var mm = u.models[id];
+      tops.push({ id: id, name: id.indexOf('::') >= 0 ? id.split('::')[1] : id, t: mm.t, n: mm.n });
+    }
+    tops.sort(function (a, b) { return b.t - a.t; });
+    // 本周（周一开始）
+    var dow = (new Date(now()).getDay() + 6) % 7; // 0=周一
+    var weekISO = zero();
+    for (var wi = 0; wi <= dow; wi++) addU(weekISO, u.days[dayKey(now() - (dow - wi) * 86400000)] || zero());
+
+    return {
+      today: u.days[dayKey()] || zero(),
+      yesterday: u.days[dayKey(now() - 86400000)] || zero(),
+      week: sumDays(st, 7),
+      weekISO: weekISO,
+      month: sumDays(st, 30),
+      total: u.total || zero(),
+      byDay: byDay,
+      tops: tops.slice(0, 6)
+    };
+  }
+
+  /* ---------- 路由：纯内存计算，零网络 ---------- */
+  // 排序用延迟：失败的最差；未测量的视为"未知"，排在已测量之后但优于失败
+  function latOf(m) {
+    if (m.ok === false) return 999999;
+    var l = m.lat | 0;
+    return l > 0 ? l : 999998;
+  }
+
+  // 统一比较：健康优先 → 失败次数少优先 → 延迟低优先
+  function cmp(a, b) {
+    var ao = a.ok === true ? 0 : 1, bo = b.ok === true ? 0 : 1;
+    if (ao !== bo) return ao - bo;
+    if (ao === 1) {
+      var af = a.fails || 0, bf = b.fails || 0;
+      if (af !== bf) return af - bf;
+    }
+    return latOf(a) - latOf(b);
+  }
+
+  function rank(st, pool) {
+    var s = st.cfg.strategy || 'latency';
+    var healthy = [], others = [];
+    for (var i = 0; i < pool.length; i++) (pool[i].ok === true ? healthy : others).push(pool[i]);
+    var list = healthy.length ? healthy : others;
+
+    if (s === 'priority') {
+      list.sort(function (a, b) { return (b.p || 0) - (a.p || 0) || cmp(a, b); });
+    } else if (s === 'weight') {
+      var tot = 0, i2;
+      for (i2 = 0; i2 < list.length; i2++) tot += Math.max(1, list[i2].w || 1);
+      var r = Math.random() * tot, acc = 0;
+      for (i2 = 0; i2 < list.length; i2++) {
+        acc += Math.max(1, list[i2].w || 1);
+        if (r <= acc) return [list[i2]].concat(list.slice(0, i2), list.slice(i2 + 1));
+      }
+    } else if (s === 'rr') {
+      // 用 hits 做游标；时间兜底保证长时间无写入也能轮换
+      list.sort(function (a, b) {
+        return ((a.hits || 0) % 997) - ((b.hits || 0) % 997) ||
+          (Math.floor(now() / 3000) % 2 ? -1 : 1) * (cmp(a, b));
+      });
+    } else {
+      list.sort(function (a, b) {
+        return cmp(a, b);
+      });
+    }
+    return list;
+  }
+
+  function candidates(st, want) {
+    var t = now(), out = [];
+    for (var i = 0; i < st.models.length; i++) {
+      var m = st.models[i];
+      if (!m.enabled) continue;
+      if (m.cooldown && m.cooldown > t) continue;
+      if (!pOf(st, m.pid)) continue;
+      out.push(m);
+    }
+    if (want) {
+      var exact = [];
+      var wl = String(want).toLowerCase();
+      for (var k = 0; k < out.length; k++) {
+        var mm = out[k];
+        if (mm.name === want || (mm.alias && mm.alias === want) ||
+          String(mm.name).toLowerCase() === wl || (mm.alias && String(mm.alias).toLowerCase() === wl)) exact.push(mm);
+      }
+      if (exact.length) return exact;
+    }
+    return out;
+  }
+
+  function pick(st, want) {
+    var c = candidates(st, want);
+    if (!c.length) return null;
+    var r = rank(st, c);
+    return r.length ? r[0] : null;
+  }
+
+  function isStale(st, m) {
+    var lim = (st.cfg.staleMin || 5) * 60000;
+    return !m.checkedAt || (now() - m.checkedAt) > lim;
+  }
+
+  /* ---------- 对外暴露的名字（客户端可见） ---------- */
+  function publicName(m) { return m.alias || m.name; }
+
+  function enabledModels(st) {
+    var out = [];
+    for (var i = 0; i < st.models.length; i++) if (st.models[i].enabled) out.push(st.models[i]);
+    return out;
+  }
+
+  function stats(st) {
+    var total = st.models.length, en = 0, ok = 0, fastest = '', fm = 0;
+    for (var i = 0; i < st.models.length; i++) {
+      var m = st.models[i];
+      if (!m.enabled) continue;
+      en++;
+      if (m.ok === true) {
+        ok++;
+        if (!fm || (m.lat && m.lat < fm)) { fm = m.lat || 0; fastest = publicName(m); }
+      }
+    }
+    return { total: total, enabled: en, healthy: ok, providers: st.providers.length, fastest: fastest, fastestMs: fm };
+  }
+
+  /* ---------- 面板视图 ---------- */
+  function view(st) {
+    var t = now();
+    return {
+      ok: true,
+      cfg: st.cfg,
+      gwBase: gwBase(),
+      stats: stats(st),
+      providers: st.providers.map(function (p) {
+        var n = 0, en = 0;
+        for (var i = 0; i < st.models.length; i++) {
+          if (st.models[i].pid === p.id) { n++; if (st.models[i].enabled) en++; }
+        }
+        return {
+          id: p.id, name: p.name, type: p.type, base: p.base,
+          keyMask: mask(p.key), ok: p.ok, lastErr: p.lastErr || '',
+          models: n, enabled: en, lastSync: p.lastSync || 0
+        };
+      }),
+      models: st.models.map(function (m) {
+        var p = pOf(st, m.pid);
+        return {
+          id: m.id, pid: m.pid, pname: p ? p.name : '(已删除)',
+          name: m.name, alias: m.alias || '', enabled: !!m.enabled,
+          ok: m.ok, lat: m.lat || 0, checkedAt: m.checkedAt || 0,
+          err: m.err || '', cooldown: m.cooldown || 0,
+          hits: m.hits || 0, fails: m.fails || 0, w: m.w || 1, p: m.p || 0
+        };
+      }),
+      usage: usageStats(st),
+      logs: st.logs || [],
+      now: t
+    };
+  }
+
+  function gwBase() {
+    try {
+      var u = String($request.url || '');
+      var m = /^(https?:\/\/[^\/]+)/.exec(u);
+      if (m) return m[1] + '/v1';
+    } catch (e) { }
+    return 'https://mh.qx/v1';
+  }
+
+
+  /* ---------- 可复制的用量报告 ---------- */
+  function fmtT(n) {
+    n = n || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+    return String(n);
+  }
+  function usageCopy(st) {
+    // 面板「复制用量报告」
+    var u = usageStats(st);
+    var L = [];
+    L.push('【ModelHub 用量】' + dayKey());
+    L.push('每日(今日): ' + fmtT(u.today.t) + ' tokens / ' + u.today.n + ' 次');
+    L.push('每周(本周起周一): ' + fmtT(u.weekISO.t) + ' tokens / ' + u.weekISO.n + ' 次');
+    L.push('近 7 天: ' + fmtT(u.week.t) + ' tokens / ' + u.week.n + ' 次');
+    L.push('近 30 天: ' + fmtT(u.month.t) + ' tokens / ' + u.month.n + ' 次');
+    L.push('每天明细:');
+    byDayLines(u.byDay).forEach(function (x) { L.push('  ' + x); });
+    if (u.tops.length) {
+      L.push('模型 Top:');
+      u.tops.slice(0, 6).forEach(function (x) {
+        L.push('  ' + x.name + ': ' + fmtT(x.t) + ' / ' + x.n + ' 次');
+      });
+    }
+    L.push('累计: ' + fmtT(u.total.t) + ' tokens / ' + u.total.n + ' 次');
+    return L.join('\n');
+  }
+  function usageDaily(st) {
+    // 任务「用量日报」通知文本（00:05 跑：报昨天 + 近7天 + 每天明细）
+    var u = usageStats(st);
+    var L = [];
+    L.push('昨日: ' + fmtT(u.yesterday.t) + ' tokens / ' + u.yesterday.n + ' 次');
+    L.push('每周(近7天): ' + fmtT(u.week.t) + ' tokens / ' + u.week.n + ' 次');
+    L.push('每天明细:');
+    byDayLines(u.byDay.slice(-7)).forEach(function (x) { L.push('  ' + x); });
+    return L.join('\n');
+  }
+  function byDayLines(rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var x = rows[i];
+      out.push(x.d + ': ' + (x.t ? fmtT(x.t) + ' tokens / ' + x.n + ' 次' : '无用量'));
+    }
+    return out;
+  }
+
+  return {
+    KEY: KEY, now: now, dflt: dflt, load: load, save: save, log: log, uid: uid,
+    mask: mask, trimBase: trimBase, pOf: pOf,
+    urlModels: urlModels, urlChat: urlChat, urlGemini: urlGemini,
+    authHeaders: authHeaders, bodyChat: bodyChat, reqJson: reqJson, fromB64: fromB64,
+    parseModels: parseModels, extractText: extractText, errText: errText,
+    discover: discover, probe: probe, applyProbe: applyProbe,
+    usageCopy: usageCopy, usageDaily: usageDaily, fmtT: fmtT,
+    recordUsage: recordUsage, usageStats: usageStats, dayKey: dayKey,
+    rank: rank, candidates: candidates, pick: pick, isStale: isStale,
+    publicName: publicName, enabledModels: enabledModels, stats: stats,
+    view: view, gwBase: gwBase
+  };
+})();
+
+
+// ===== 用量日报 =====
+/* ==========================================================================
+ * ModelHub 用量日报 —— QX 定时任务（[task_local] 触发，$notify 推送）
+ * 报告内容：昨日(每日) + 近7天(每周) + 每天明细，与面板「用量」页同源
+ * ========================================================================== */
+function MH_USAGE() {
+  function done() { try { $done(); } catch (e) { } }
+
+  var st = MH.load();
+  var u = MH.usageStats(st);
+  var txt = MH.usageDaily(st);
+
+  try {
+    $notify('ModelHub 用量日报',
+      '昨日 ' + MH.fmtT(u.yesterday.t) + ' tok · 近7天 ' + MH.fmtT(u.week.t) + ' tok',
+      txt);
+  } catch (e) { }
+  done();
+}
+MH_USAGE();
+
+
+MH_USAGE();
