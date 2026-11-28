@@ -5,6 +5,8 @@
  * ========================================================================== */
 var MH = (function () {
   var KEY = 'modelhub.state.v1';
+  // Agnes 密钥（base64 解码后的 sk- 值）
+  var KEY_AGNES = 'sk-XaGjXJS77FniRVmacdbsfUwf1OR4wtUxTSNtCFg4cV1HeS82';
   var MAXLOG = 200;
 
   function now() { return Date.now(); }
@@ -17,7 +19,8 @@ var MH = (function () {
       cfg: {
         strategy: 'latency', staleMin: 5, checkMin: 10,
         gwToken: '', timeoutMs: 60000, overrideModel: true, slidingCheck: false,
-        checkMode: 'ping'
+        checkMode: 'ping',
+        autoRetry: true, retryMaxMin: 10, retryBaseMs: 1500
       },
       usage: null,
       logs: []
@@ -36,17 +39,55 @@ var MH = (function () {
     for (var k in d.cfg) if (c[k] === undefined) c[k] = d.cfg[k];
     o.cfg = c;
     if (!o.usage || !o.usage.days) o.usage = { days: {}, models: {}, total: { p: 0, c: 0, t: 0, n: 0 } };
+    if (!o.usage.days) o.usage.days = {};
+    if (!o.usage.months) o.usage.months = {};
+    if (!o.usage.h5) o.usage.h5 = {};
+    if (!o.usage.calls) o.usage.calls = [];
     return o;
   }
 
+
+  /* ===== Agnes 预置（每次 load 自动注入，幂等）=====
+   * base 用 /v1（ModelHub 会拼 /models 与 /chat/completions）
+   * key 为 base64 解码后的真实 sk- 密钥
+   * 预置 4 个纯文本 chat 模型；image/video 走面板「刷新模型」手动勾选
+   */
+  var AGNES = {
+    id: 'p_agnes', name: 'Agnes 2.0', type: 'openai',
+    base: 'https://api.agnes-ai.cn/v1',
+    key: KEY_AGNES
+  };
+  var AGNES_CHAT = ['agnes-3.0-flash','agnes-2.5-flash','agnes-2.5-pro','agnes-3.0-pro'];
+
+  function seedAgnes(st) {
+    var p = null;
+    for (var i = 0; i < st.providers.length; i++) if (st.providers[i].id === AGNES.id) { p = st.providers[i]; break; }
+    if (!p) {
+      p = { id: AGNES.id, name: AGNES.name, type: AGNES.type, base: AGNES.base, key: AGNES.key,
+            ok: null, lastErr: '', lastSync: 0, added: now() };
+      st.providers.push(p);
+    }
+    // key 可能因升级而更新，始终同步
+    p.key = AGNES.key;
+    var have = {};
+    for (var m = 0; m < st.models.length; m++) have[st.models[m].id] = 1;
+    for (var w = 0; w < AGNES_CHAT.length; w++) {
+      var mid = AGNES.id + '::' + AGNES_CHAT[w];
+      if (!have[mid]) st.models.push({
+        id: mid, pid: AGNES.id, name: AGNES_CHAT[w], alias: '', enabled: true,
+        ok: null, lat: 0, checkedAt: 0, err: '', cooldown: 0, hits: 0, fails: 0, w: 1, p: 0, added: now()
+      });
+    }
+  }
+
   function load() {
+    var st;
     try {
       var s = $prefs.valueForKey(KEY);
-      if (!s) return dflt();
-      return migrate(JSON.parse(s));
-    } catch (e) {
-      return dflt();
-    }
+      st = s ? migrate(JSON.parse(s)) : dflt();
+    } catch (e) { st = dflt(); }
+    seedAgnes(st);
+    return st;
   }
 
   function save(st) {
@@ -284,21 +325,31 @@ var MH = (function () {
     return a;
   }
 
-  // 一次请求记一笔
-  function recordUsage(st, mid, u) {
-    if (!st.usage || !st.usage.days) st.usage = { days: {}, models: {}, total: zero() };
+  // 一次请求记一笔（extra = {ms, retries, ok}；失败也记流水，token 聚合永久保留）
+  function recordUsage(st, mid, u, extra) {
+    extra = extra || {};
+    if (!st.usage || !st.usage.days) st.usage = { days: {}, models: {}, total: zero(), months: {}, h5: {}, calls: [] };
+    if (!st.usage.months) st.usage.months = {};
+    if (!st.usage.h5) st.usage.h5 = {};
+    if (!st.usage.calls) st.usage.calls = [];
     u = u || {};
-    var p = u.prompt_tokens || 0, c = u.completion_tokens || 0;
-    var t = u.total_tokens || (p + c);
-    if (!p && !c && !t) return false;
-    var rec = { p: p, c: c, t: t, n: 1 };
-    var k = dayKey();
-    st.usage.days[k] = addU(st.usage.days[k] || zero(), rec);
-    if (mid) st.usage.models[mid] = addU(st.usage.models[mid] || zero(), rec);
-    st.usage.total = addU(st.usage.total || zero(), rec);
-    // 只留最近 120 天
-    var keys = Object.keys(st.usage.days).sort();
-    while (keys.length > 120) delete st.usage.days[keys.shift()];
+    var p = u.prompt_tokens || 0, c = u.completion_tokens || 0, t = u.total_tokens || (p + c);
+    if (t) {
+      // 5 小时桶（UTC 对齐，永久保留）
+      var b = Math.floor(now() / 18000000);
+      st.usage.h5[b] = addU(st.usage.h5[b] || zero(), { p: p, c: c, t: t, n: 1 });
+      // 日（永久保留，不再 120 天裁剪）
+      var k = dayKey();
+      st.usage.days[k] = addU(st.usage.days[k] || zero(), { p: p, c: c, t: t, n: 1 });
+      // 月汇总（永久保留）
+      var mk = k.slice(0, 7);
+      st.usage.months[mk] = addU(st.usage.months[mk] || zero(), { p: p, c: c, t: t, n: 1 });
+      if (mid) st.usage.models[mid] = addU(st.usage.models[mid] || zero(), { p: p, c: c, t: t, n: 1 });
+      st.usage.total = addU(st.usage.total || zero(), { p: p, c: c, t: t, n: 1 });
+    }
+    // 调用流水（环形 500 条；聚合统计永久）
+    st.usage.calls.push({ t: now(), m: mid || '', tok: t, ms: extra.ms || 0, r: extra.retries || 0, ok: extra.ok === false ? 0 : 1 });
+    if (st.usage.calls.length > 500) st.usage.calls = st.usage.calls.slice(-500);
     return true;
   }
 
@@ -325,13 +376,48 @@ var MH = (function () {
       tops.push({ id: id, name: id.indexOf('::') >= 0 ? id.split('::')[1] : id, t: mm.t, n: mm.n });
     }
     tops.sort(function (a, b) { return b.t - a.t; });
+    // 本周（周一开始）
+    var dow = (new Date(now()).getDay() + 6) % 7; // 0=周一
+    var weekISO = zero();
+    for (var wi = 0; wi <= dow; wi++) addU(weekISO, u.days[dayKey(now() - (dow - wi) * 86400000)] || zero());
+
     return {
       today: u.days[dayKey()] || zero(),
+      yesterday: u.days[dayKey(now() - 86400000)] || zero(),
       week: sumDays(st, 7),
+      weekISO: weekISO,
       month: sumDays(st, 30),
+      monthCal: (u.months || {})[dayKey().slice(0, 7)] || zero(),
       total: u.total || zero(),
       byDay: byDay,
-      tops: tops.slice(0, 6)
+      tops: tops.slice(0, 6),
+      // 5 小时窗口
+      w5h: (u.h5 || {})[Math.floor(now() / 18000000)] || zero(),
+      by5h: (function () {
+        var out = [], cur = Math.floor(now() / 18000000), h = u.h5 || {};
+        for (var i = 0; i < 24; i++) {
+          var bk = cur - (23 - i), d = h[bk] || zero();
+          out.push({ b: bk, t: d.t, n: d.n });
+        }
+        return out;
+      })(),
+      // 105 天热力网格（GitHub 风）
+      grid: (function () {
+        var out = [];
+        for (var g = 104; g >= 0; g--) {
+          var kk = dayKey(now() - g * 86400000);
+          var dd = u.days[kk] || zero();
+          out.push({ d: kk.slice(5), t: dd.t, n: dd.n });
+        }
+        return out;
+      })(),
+      activeDays: (function () {
+        var c = 0;
+        for (var k2 in u.days) if ((u.days[k2].t || 0) > 0) c++;
+        return c;
+      })(),
+      recentCalls: (u.calls || []).slice(-50),
+      totalCalls: (u.total || zero()).n || 0
     };
   }
 
@@ -485,6 +571,60 @@ var MH = (function () {
     return 'https://mh.qx/v1';
   }
 
+
+  /* ---------- 可复制的用量报告（全窗口）---------- */
+  function fmtT(n) {
+    n = n || 0;
+    if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+    if (n >= 1e4) return (n / 1e3).toFixed(1) + 'k';
+    return String(n);
+  }
+  function usageCopy(st) {
+    var u = usageStats(st);
+    var L = [];
+    L.push('【ModelHub 用量报告】' + dayKey());
+    L.push('每5小时(当前窗口): ' + fmtT(u.w5h.t) + ' tokens / ' + u.w5h.n + ' 次');
+    L.push('每日(今日): ' + fmtT(u.today.t) + ' tokens / ' + u.today.n + ' 次');
+    L.push('每周(本周起周一): ' + fmtT(u.weekISO.t) + ' tokens / ' + u.weekISO.n + ' 次');
+    L.push('每月(本月): ' + fmtT(u.monthCal.t) + ' tokens / ' + u.monthCal.n + ' 次');
+    L.push('近 7 天: ' + fmtT(u.week.t) + ' tokens / ' + u.week.n + ' 次');
+    L.push('近 30 天: ' + fmtT(u.month.t) + ' tokens / ' + u.month.n + ' 次');
+    L.push('总共: ' + fmtT(u.total.t) + ' tokens / ' + u.total.n + ' 次 · 活跃 ' + u.activeDays + ' 天');
+    L.push('每天明细(近 14 天):');
+    byDayLines(u.byDay).forEach(function (x) { L.push('  ' + x); });
+    if (u.tops.length) {
+      L.push('模型 Top:');
+      u.tops.slice(0, 6).forEach(function (x) {
+        L.push('  ' + x.name + ': ' + fmtT(x.t) + ' tokens / ' + x.n + ' 次');
+      });
+    }
+    return L.join('\n');
+  }
+  function usageDaily(st) {
+    // 任务通知：全窗口摘要
+    var u = usageStats(st);
+    var L = [];
+    L.push('每5小时: ' + fmtT(u.w5h.t) + ' tok / ' + u.w5h.n + ' 次');
+    L.push('今日: ' + fmtT(u.today.t) + ' tok / ' + u.today.n + ' 次');
+    L.push('本周(周一): ' + fmtT(u.weekISO.t) + ' tok / ' + u.weekISO.n + ' 次');
+    L.push('本月: ' + fmtT(u.monthCal.t) + ' tok / ' + u.monthCal.n + ' 次');
+    L.push('近7天: ' + fmtT(u.week.t) + ' tok / ' + u.week.n + ' 次');
+    L.push('总共: ' + fmtT(u.total.t) + ' tok / ' + u.total.n + ' 次 · 活跃 ' + u.activeDays + ' 天');
+    if (u.tops.length) {
+      L.push('模型 Top3:');
+      u.tops.slice(0, 3).forEach(function (x) { L.push('  ' + x.name + ' ' + fmtT(x.t) + ' tok / ' + x.n + ' 次'); });
+    }
+    return L.join('\n');
+  }
+  function byDayLines(rows) {
+    var out = [];
+    for (var i = 0; i < rows.length; i++) {
+      var x = rows[i];
+      out.push(x.d + ': ' + (x.t ? fmtT(x.t) + ' tokens / ' + x.n + ' 次' : '无用量'));
+    }
+    return out;
+  }
+
   return {
     KEY: KEY, now: now, dflt: dflt, load: load, save: save, log: log, uid: uid,
     mask: mask, trimBase: trimBase, pOf: pOf,
@@ -492,6 +632,7 @@ var MH = (function () {
     authHeaders: authHeaders, bodyChat: bodyChat, reqJson: reqJson, fromB64: fromB64,
     parseModels: parseModels, extractText: extractText, errText: errText,
     discover: discover, probe: probe, applyProbe: applyProbe,
+    usageCopy: usageCopy, usageDaily: usageDaily, fmtT: fmtT,
     recordUsage: recordUsage, usageStats: usageStats, dayKey: dayKey,
     rank: rank, candidates: candidates, pick: pick, isStale: isStale,
     publicName: publicName, enabledModels: enabledModels, stats: stats,

@@ -62,6 +62,7 @@ function startUpstream(port, kind) {
 }
 
 /* ---------------- QX 环境 ---------------- */
+const ROOT = require('path').dirname(__dirname);
 let store = {};
 if (fs.existsSync(STATE)) { try { store = JSON.parse(fs.readFileSync(STATE, 'utf8')); } catch (e) { } }
 function persist() { fs.writeFileSync(STATE, JSON.stringify(store)); }
@@ -158,56 +159,60 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   console.log('\n【4】探活');
   r = await installQX(mkReq('/mh/api/check', 'POST', {}), { file: F });
   j = jparse(r);
-  ok(j && j.total === 5, '检测 5 个', j && j.total);
+  ok(j && j.total === 9, '检测 9 个(含4个Agnes预置)', j && j.total);
   ok(j && j.healthy === 4, '4 个可用', j && { h: j.healthy, bad: j.bad });
 
   console.log('\n【5】状态');
   r = await installQX(mkReq('/mh/api/state'), { file: F });
   j = jparse(r);
-  ok(j && j.providers.length === 3, 'providers 3', j && j.providers.length);
+  ok(j && j.providers.length === 4, 'providers 4(含Agnes)', j && j.providers.length);
   ok(j && j.providers.every(p => !p.key && p.keyMask.indexOf('••••') > 0), 'Key 脱敏', j && j.providers.map(p => p.keyMask));
   ok(j && j.gwBase === ENTRY + '/v1', '网关地址正确', j && j.gwBase);
 
-  console.log('\n【6】GET /v1/models（echo 阶段）');
+  console.log('\n【6】GET /v1/models（网关代答）');
   r = await installQX(mkReq('/v1/models'), { file: F });
   j = jparse(r);
   ok(r.status && r.status.indexOf('200') > 0, '返回 200', r.status);
   const ids = (j && j.data || []).map(x => x.id);
-  ok(ids.length === 3 && ids.indexOf('alpha') >= 0, '只暴露可路由的 openai 模型', ids);
-  ok(ids.indexOf('claude-x') < 0 && ids.indexOf('gemini-pro') < 0, 'anthropic/gemini 不在清单里', ids);
+  ok(ids.length === 9 && ids.indexOf('alpha') >= 0, '暴露全部启用模型(含4 Agnes)', ids);
+  ok(ids.indexOf('claude-x') >= 0 && ids.indexOf('gemini-pro') >= 0, 'anthropic/gemini 也在清单(网关可转换)', ids);
 
-  console.log('\n【7】路由：POST /v1/chat/completions（request-header 阶段）');
+  console.log('\n【7】网关代答：POST /v1/chat/completions');
   r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'alpha', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
-  ok(r.url === 'http://127.0.0.1:8811/v1/chat/completions', '改写到了 8811', r.url);
-  ok(r.headers && r.headers.Authorization === 'Bearer sk-a', '注入目标通道 Key', r.headers && r.headers.Authorization);
-  ok(!r.headers.Host && !r.headers.host, '清掉入口 Host', Object.keys(r.headers || {}));
-  ok(r.body === undefined, '同名模型不改 body', r.body);
+  let rb = null; try { rb = JSON.parse(r.body); } catch (e) { }
+  ok(r.status && r.status.indexOf('200') > 0, '200（代答）', r.status);
+  ok(rb && rb.model === 'alpha' && /hi from alpha/.test(JSON.stringify(rb)), '上游 alpha 应答(网关转换)', rb && rb.model);
 
-  console.log('\n【8】路由：客户端乱填模型名 → 换名');
+  console.log('\n【8】网关：客户端乱填模型名 → 自动换名');
   r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'gpt-4o-whatever', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
   let ob = null; try { ob = JSON.parse(r.body); } catch (e) { }
-  ok(r.url && r.url.indexOf('8811') > 0, '照样转发', r.url);
-  ok(ob && (ob.model === 'alpha' || ob.model === 'beta'), 'body 里换成真实模型名', ob && ob.model);
+  ok(ob && ob.model && ob.model !== 'gpt-4o-whatever', '响应里换成真实模型名', ob && ob.model);
+  ok(ob && ob.choices && ob.choices[0].message.content, '内容来自真实上游', ob && ob.choices && ob.choices[0].message.content);
 
-  console.log('\n【9】路由：请求 anthropic 模型名 → 回退到 openai 池');
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'claude-x', messages: [] }), { file: F });
-  ok(r.url && r.url.indexOf('8811') > 0, '不会打到 anthropic', r.url);
+  console.log('\n【9】网关：请求 anthropic 模型名 → 网关直接转换');
+  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'claude-x', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
+  let ob9 = null; try { ob9 = JSON.parse(r.body); } catch (e) { }
+  ok(ob9 && ob9.model === 'claude-x' && ob9.x_modelhub && ob9.x_modelhub.provider === 'anthropic',
+     'anthropic 走网关转换（不再是回退池）', ob9 && ob9.model);
+  ok(ob9 && ob9.choices && /claude/.test(ob9.choices[0].message.content), '内容来自上游 B', ob9 && ob9.choices && ob9.choices[0].message.content);
 
-  console.log('\n【10】路由：无可路由通道 → 原样放行');
+  console.log('\n【10】网关：无可路由通道 → 友好 200（不返回错误码）');
   let stObj = JSON.parse(store['modelhub.state.v1']);
-  stObj.models.forEach(m => { m.enabled = (m.name === 'claude-x'); });
+  stObj.models.forEach(m => { m.enabled = false; });
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'x', messages: [] }), { file: F });
-  ok(!r.url && Object.keys(r).length === 0, '返回空对象（不改写）', r);
+  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'x', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
+  let ob10 = null; try { ob10 = JSON.parse(r.body); } catch (e) { }
+  ok(r.status && r.status.indexOf('200') > 0, '仍返回 200（永不报错）', r.status);
+  ok(ob10 && ob10.x_modelhub && ob10.x_modelhub.mapped === 'no_channel', '友好提示 no_channel', ob10 && ob10.x_modelhub && ob10.x_modelhub.mapped);
 
   console.log('\n【11】冷却：坏通道被跳过');
   stObj = JSON.parse(store['modelhub.state.v1']);
   stObj.models.forEach(m => { m.enabled = (m.name === 'alpha' || m.name === 'beta'); m.ok = true; m.lat = 100; m.cooldown = 0; });
   stObj.models.find(m => m.name === 'alpha').cooldown = Date.now() + 600000;
   store['modelhub.state.v1'] = JSON.stringify(stObj); persist();
-  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: '', messages: [] }), { file: F });
-  ok(r.url && r.url.indexOf('8811') > 0, '仍转发', r.url);
+  r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: '', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
   let bb = null; try { bb = JSON.parse(r.body); } catch (e) { }
+  ok(r.status && r.status.indexOf('200') > 0, '仍 200', r.status);
   ok(bb && bb.model === 'beta', '跳过冷却中的 alpha，选 beta', bb && bb.model);
 
   console.log('\n【12】Cron 探活');
@@ -217,7 +222,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   await installQX(undefined, { file: F });
   stObj = JSON.parse(store['modelhub.state.v1']);
   const checked = stObj.models.filter(m => m.enabled && m.checkedAt > 0).length;
-  ok(checked === 4, 'cron 检查了 4 个', { checked });
+  ok(checked === 8, 'cron 检查了 8 个(含4 Agnes)', { checked });
   ok(stObj.logs.some(l => l.m.indexOf('[cron]') === 0), '写入 cron 日志');
 
   console.log('\n【13】Token 用量');
@@ -264,7 +269,7 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
 
   r = await installQX(mkReq('/mh/api/state'), { file: F });
   j = jparse(r);
-  ok(j && j.providers.length === 1 && j.models.length === 3, 'GET 状态读回', j && { p: j.providers.length, m: j.models.length });
+  ok(j && j.providers.length === 2 && j.models.length === 7, 'GET 状态读回(含Agnes)', j && { p: j.providers.length, m: j.models.length });
   const betaM = (j.models || []).find(m => m.name === 'beta');
   ok(betaM && betaM.enabled === false, '字符串 "false" 解析成布尔', betaM && betaM.enabled);
 
@@ -282,6 +287,171 @@ function jparse(r) { try { return JSON.parse(r.body); } catch (e) { return null;
   ok(j && j.prefsTest && j.prefsTest.write && j.prefsTest.readBack, 'diag: 写入并回读成功', j && j.prefsTest);
   ok(j && j.req && j.req.path === '/mh/api/diag', 'diag: 请求路径正确', j && j.req);
   console.log('    diag 摘要: ' + JSON.stringify({ has: j && j.has, prefsTest: j && j.prefsTest, bodyType: j && j.req && j.req.bodyType, store: j && j.store }));
+
+  console.log('\n【18】用量：每日/每周/每天 + usage 端点 + 日报脚本');
+  {
+    // 造一份带已知用量的 state
+    function dk(offset) {
+      var d = new Date(Date.now() - offset * 86400000);
+      return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+    }
+    const stx = { v:1, t:0, providers:[], models:[], cfg:{strategy:'latency',staleMin:5,checkMin:10,gwToken:'',timeoutMs:60000,overrideModel:true,slidingCheck:false,checkMode:'ping'},
+      usage:{ days:{}, models:{}, total:{p:0,c:0,t:0,n:0} }, logs:[] };
+    stx.usage.days[dk(0)] = {p:30,c:273,t:303,n:2};
+    stx.usage.days[dk(1)] = {p:90,c:11,t:101,n:1};
+    stx.usage.days[dk(2)] = {p:900,c:101,t:1001,n:5};
+    stx.usage.days[dk(4)] = {p:3604,c:400,t:4004,n:9};
+    stx.usage.total = {p:4624,c:515,t:5409,n:17};
+    store['modelhub.state.v1'] = JSON.stringify(stx); persist();
+
+    r = await installQX(mkReq('/mh/api/usage'), { file: F });
+    j = jparse(r);
+    ok(j && j.ok && j.u && j.u.today.t === 303, '每日(今日)=303', j && j.u && j.u.today);
+    ok(j.u.yesterday.t === 101, '昨日=101', j.u.yesterday);
+    ok(j.u.week.t === 5409, '近7天=5409', j.u.week);
+    ok(j.u.weekISO.t >= 303, '本周(周一)包含今日', j.u.weekISO);
+    ok(j.u.byDay.length === 14, '每天明细 14 行', j.u.byDay.length);
+    ok(j.copy.indexOf('5409') >= 0 && j.copy.indexOf('303') >= 0, '可复制报告含数字', j.copy && j.copy.slice(0, 80));
+
+    // 日报任务脚本（modelhub-usage.js）冒烟：用全局 mock（贴合 QX 运行时）
+    let notified = null;
+    global.$prefs = { valueForKey: k => store[k] || null, setValueForKey: (v,k) => { store[k]=v; return true; } };
+    global.$notify = (t1,t2,b) => { notified = [t1,t2,b]; };
+    global.$done = () => {};
+    (0,eval)(fs.readFileSync(ROOT + '/out/modelhub-usage.js', 'utf8'));
+    ok(notified && /用量/.test(notified[0]), '通知标题含"用量"', notified && notified[0]);
+    ok(notified && /今日: 303/.test(notified[2]), '报告含今日数字', notified && notified[2].slice(0,80));
+    ok(notified && /5409/.test(notified[2]), '报告含近7天数字', notified && notified[2].slice(0,80));
+    ok(notified && /每5小时/.test(notified[2]), '报告含5小时窗口', notified && notified[2].slice(0,80));
+    delete global.$prefs; delete global.$notify; delete global.$done;
+  }
+
+
+  console.log('\n【19】永不中断重试引擎：上游失败自动重试 + 自动换模型 + 永不返回错误码');
+  {
+    // 造一个「先失败 2 次再成功」的上游
+    const FLAKY_PORT = 8821;
+    let failLeft = 2, hitCount = 0;
+    const upF = await new Promise(res => {
+      const srv = http.createServer((req, rsp) => {
+        let cs = []; req.on('data', c => cs.push(c));
+        req.on('end', () => {
+          hitCount++;
+          if (failLeft > 0) { failLeft--; rsp.writeHead(503, { 'Content-Type': 'application/json' }); return rsp.end('{"error":{"message":"overloaded"}}'); }
+          let j = {}; try { j = JSON.parse(Buffer.concat(cs).toString('utf8')); } catch (e) { }
+          rsp.writeHead(200, { 'Content-Type': 'application/json' });
+          rsp.end(JSON.stringify({ id: 'c-flaky', object: 'chat.completion', model: j.model,
+            choices: [{ index: 0, message: { role: 'assistant', content: 'flaky ok after ' + hitCount }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 3, completion_tokens: 4, total_tokens: 7 } }));
+        });
+      });
+      srv.listen(FLAKY_PORT, '127.0.0.1', () => res(srv));
+    });
+
+    store = {}; persist();
+    // provider F（openai）+ 模型 flaky
+    r = await installQX(mkReq('/mh/api/provider.add', 'POST', { name: 'F', base: 'http://127.0.0.1:' + FLAKY_PORT + '/v1', key: 'sk-f', type: 'openai' }), { file: F });
+    j = jparse(r);
+    const pidF = j && j.pid;
+    ok(pidF, '新增 provider F', pidF);
+    await installQX(mkReq('/mh/api/model.add', 'POST', { pid: pidF, names: ['flaky'] }), { file: F });
+    // 关掉自动重试的等待时间（测试用短退避）
+    await installQX(mkReq('/mh/api/cfg.set', 'POST', { retryBaseMs: 300, retryMaxMin: 1 }), { file: F });
+    // 只留 flaky 一个模型
+    let stf = JSON.parse(store['modelhub.state.v1']);
+    stf.models.forEach(m => { m.enabled = (m.name === 'flaky'); m.ok = true; m.cooldown = 0; m.checkedAt = Date.now(); });
+    store['modelhub.state.v1'] = JSON.stringify(stf); persist();
+
+    r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'flaky', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
+    let fb = null; try { fb = JSON.parse(r.body); } catch (e) { }
+    ok(r.status && r.status.indexOf('200') > 0, '重试后仍 200（不返回错误码）', r.status);
+    ok(fb && /flaky ok after 3/.test(JSON.stringify(fb)), '失败 2 次后自动重试成功', fb && fb.choices && fb.choices[0].message.content);
+    ok(hitCount >= 3, '确实重试了（上游被打了 ' + hitCount + ' 次）', hitCount);
+
+    // 调用流水：记录了重试次数
+    r = await installQX(mkReq('/mh/api/usage'), { file: F });
+    j = jparse(r);
+    const rc = j.calls || [];
+    ok(rc.length >= 1, '调用流水有记录', rc.length);
+    ok(rc.length >= 1 && rc[rc.length - 1].r >= 2, '流水记录重试次数 r=' + (rc.length ? rc[rc.length - 1].r : '-'), rc.length ? rc[rc.length - 1] : null);
+    ok(rc.length >= 1 && rc[rc.length - 1].tok === 7, '流水记录 token 数', rc.length ? rc[rc.length - 1] : null);
+
+    // 全部模型永久失败 → 友好 200（不是 5xx）
+    failLeft = 9999;
+    let stf2 = JSON.parse(store['modelhub.state.v1']);
+    stf2.cfg.retryMaxMin = 0.02;   // ~1.2s 上限
+    stf2.cfg.retryBaseMs = 300;
+    stf2.models.forEach(m => { m.enabled = (m.name === 'flaky'); m.ok = true; m.cooldown = 0; });
+    store['modelhub.state.v1'] = JSON.stringify(stf2); persist();
+    r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'flaky', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
+    let gb = null; try { gb = JSON.parse(r.body); } catch (e) { }
+    ok(r.status && r.status.indexOf('200') > 0, '持续失败也返回 200（绝不 5xx）', r.status);
+    ok(gb && gb.x_modelhub && gb.x_modelhub.mapped === 'retry_exhausted', '友好提示 retry_exhausted', gb && gb.x_modelhub);
+    ok(gb && gb.choices && /自动重试/.test(gb.choices[0].message.content), '提示文案含"自动重试"', gb && gb.choices && gb.choices[0].message.content);
+
+    upF.close();
+  }
+
+  console.log('\n【20】用量永久保留：5小时桶 / 月汇总 / 调用流水 / 不裁剪');
+  {
+    store = {}; persist();
+    function dk2(offset) {
+      var d = new Date(Date.now() - offset * 86400000);
+      return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+    }
+    const stp = { v:1, t:0, providers:[], models:[], cfg:{strategy:'latency',staleMin:5,checkMin:10,gwToken:'',timeoutMs:60000,overrideModel:true,slidingCheck:false,checkMode:'ping',autoRetry:true,retryMaxMin:10,retryBaseMs:1500},
+      usage:{ days:{}, models:{}, total:{p:0,c:0,t:0,n:0}, months:{}, h5:{}, calls:[] }, logs:[] };
+    // 200 天历史（验证不裁剪）
+    for (var q = 0; q < 200; q++) stp.usage.days[dk2(q)] = { p:1, c:2, t:3, n:1 };
+    stp.usage.months[dk2(0).slice(0,7)] = { p:10, c:20, t:30, n:5 };
+    stp.usage.h5[Math.floor(Date.now()/18000000)] = { p:1, c:1, t:2, n:1 };
+    stp.usage.total = { p:10, c:20, t:30, n:5 };
+    stp.usage.calls = [{ t: Date.now()-1000, m:'m1', tok:11, ms:120, r:0, ok:1 }];
+    store['modelhub.state.v1'] = JSON.stringify(stp); persist();
+
+    r = await installQX(mkReq('/mh/api/usage'), { file: F });
+    j = jparse(r);
+    ok(j && j.u && j.u.activeDays >= 200, '活跃天数 >= 200（历史不裁剪）', j && j.u && j.u.activeDays);
+    ok(j.u.w5h && j.u.w5h.t === 2, '5 小时窗口统计正确', j.u.w5h);
+    ok(Array.isArray(j.u.by5h) && j.u.by5h.length === 24, '5 小时桶 24 段', j.u.by5h && j.u.by5h.length);
+    ok(j.u.monthCal && j.u.monthCal.t === 30, '本月汇总正确', j.u.monthCal);
+    ok(Array.isArray(j.u.grid) && j.u.grid.length === 105, '热力网格 105 天', j.u.grid && j.u.grid.length);
+    ok(Array.isArray(j.calls) && j.calls.length === 1 && j.calls[0].tok === 11, '调用流水返回', j.calls);
+    ok(j.copy.indexOf('每5小时') >= 0 && j.copy.indexOf('总共') >= 0 && j.copy.indexOf('本月') >= 0, '报告含全部窗口', j.copy && j.copy.slice(0,120));
+
+    // 调用一次后：流水新增 + 5h 桶 + 月汇总累加
+    await installQX(mkReq('/mh/api/provider.add', 'POST', { name: 'A', base: 'http://127.0.0.1:8811/v1', key: 'sk-a', type: 'openai' }), { file: F });
+    let stp2 = JSON.parse(store['modelhub.state.v1']);
+    const pidA2 = (stp2.providers.find(p => p.name === 'A') || {}).id;
+    await installQX(mkReq('/mh/api/model.add', 'POST', { pid: pidA2, names: ['alpha'] }), { file: F });
+    stp2 = JSON.parse(store['modelhub.state.v1']);
+    stp2.models.forEach(m => { m.enabled = (m.name === 'alpha'); m.ok = true; m.cooldown = 0; m.checkedAt = Date.now(); });
+    store['modelhub.state.v1'] = JSON.stringify(stp2); persist();
+    r = await installQX(mkReq('/v1/chat/completions', 'POST', { model: 'alpha', messages: [{ role: 'user', content: 'hi' }] }), { file: F });
+    ok(r.status && r.status.indexOf('200') > 0, '网关成功应答', r.status);
+    r = await installQX(mkReq('/mh/api/usage'), { file: F });
+    j = jparse(r);
+    ok(j.calls.length === 2, '流水新增一条（共 2 条）', j.calls.length);
+    ok(j.calls[j.calls.length-1].ok === 1 && j.calls[j.calls.length-1].tok === 21, '新流水含 token=21', j.calls[j.calls.length-1]);
+    ok(j.u.today.t === 24, '今日总量累加（3+21）', j.u.today);
+  }
+
+  console.log('\n【17】Agnes 预置种子（load 自动注入，幂等）');
+  store = {}; persist();
+  r = await installQX(mkReq('/mh/api/state'), { file: F });
+  j = jparse(r);
+  const agP = (j.providers || []).find(p => p.id === 'p_agnes');
+  ok(agP, 'p_agnes 提供商自动注入', agP && { base: agP.base, type: agP.type });
+  ok(agP && agP.base === 'https://api.agnes-ai.cn/v1', 'Agnes base 正确(/v1)', agP && agP.base);
+  const agM = (j.models || []).filter(m => m.pid === 'p_agnes');
+  ok(agM.length === 4, '预置 4 个 chat 模型', agM.map(m => m.name));
+  ok(agM.every(m => m.enabled === true), '4 个模型默认启用', null);
+  ok((agM.map(m => m.name)).includes('agnes-3.0-flash'), '含 agnes-3.0-flash', null);
+  // 幂等：再次 load 不应重复注入
+  r = await installQX(mkReq('/mh/api/state'), { file: F });
+  j = jparse(r);
+  ok((j.providers || []).filter(p => p.id === 'p_agnes').length === 1, '重复 load 不重复注入', null);
+  ok((j.models || []).filter(m => m.pid === 'p_agnes').length === 4, '重复 load 模型数不变', null);
 
   console.log('\n' + '='.repeat(52));
   console.log('通过 ' + pass + ' / 失败 ' + failed);

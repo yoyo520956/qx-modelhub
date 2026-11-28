@@ -143,6 +143,11 @@ function MH_PANEL() {
     return json({ ok: true });
   }
 
+  if (action === 'usage') {
+    var calls = ((st.usage || {}).calls || []).slice(-200);
+    return json({ ok: true, u: MH.usageStats(st), calls: calls, copy: MH.usageCopy(st) });
+  }
+
   if (action === 'usage.reset') {
     st.usage = { days: {}, models: {}, total: { p: 0, c: 0, t: 0, n: 0 } };
     MH.log(st, '[usage] 用量统计已清零');
@@ -257,13 +262,16 @@ function MH_PANEL() {
 
   /* ---------------- 配置 ---------------- */
   if (action === 'cfg.set') {
-    var allow = ['strategy', 'staleMin', 'checkMin', 'gwToken', 'timeoutMs', 'overrideModel', 'slidingCheck', 'checkMode'];
+    var allow = ['strategy', 'staleMin', 'checkMin', 'gwToken', 'timeoutMs', 'overrideModel', 'slidingCheck', 'checkMode', 'autoRetry', 'retryMaxMin', 'retryBaseMs'];
     for (var i = 0; i < allow.length; i++) {
       var k = allow[i];
       if (params[k] !== undefined) st.cfg[k] = params[k];
     }
     st.cfg.overrideModel = bool(st.cfg.overrideModel);
     st.cfg.slidingCheck = bool(st.cfg.slidingCheck);
+    st.cfg.autoRetry = bool(st.cfg.autoRetry);
+    st.cfg.retryMaxMin = Math.max(1, Math.min(60, parseFloat(st.cfg.retryMaxMin) || 10));
+    st.cfg.retryBaseMs = Math.max(300, parseInt(st.cfg.retryBaseMs) || 1500);
     st.cfg.staleMin = Math.max(1, parseInt(st.cfg.staleMin) || 5);
     st.cfg.checkMin = Math.max(1, parseInt(st.cfg.checkMin) || 10);
     st.cfg.timeoutMs = Math.max(5000, parseInt(st.cfg.timeoutMs) || 60000);

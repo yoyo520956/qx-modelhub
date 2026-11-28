@@ -23,10 +23,6 @@ function MH_GW() {
     json({ error: { message: String(msg), type: type || 'gateway_error', code: code || null } }, code || 500);
   }
 
-  setTimeout(function () {
-    if (!answered) oaiErr('网关超时（上游未在限定时间内返回）', 504, 'timeout');
-  }, 130000);
-
   var rawPath = ($request.path || '/');
   var qi = rawPath.indexOf('?');
   var path = (qi >= 0 ? rawPath.slice(0, qi) : rawPath).replace(/\/+$/, '');
@@ -77,67 +73,133 @@ function MH_GW() {
     if (!reqObj) return oaiErr('请求体不是合法 JSON', 400, 'invalid_request_error');
 
     var want = reqObj.model || '';
-    var cands = MH.candidates(st, want);
-    if (!cands.length) {
-      return oaiErr('没有可用的模型：请先在 ModelHub 面板添加并启用模型', 503, 'no_available_model');
+    var outModel0 = want || '';
+
+    var cands0 = MH.candidates(st, want);
+    if (!cands0.length) {
+      // 无任何可用通道：友好 200（绝不返回错误码给 App）
+      var sN = MH.load();
+      MH.recordUsage(sN, null, {}, { ms: 0, retries: 0, ok: false });
+      MH.log(sN, '[gw] 无可用通道 → 友好提示(200)');
+      MH.save(sN);
+      return friendly('no_channel',
+        '(ModelHub 本地网关) 当前没有可用通道：请在面板「提供商」页确认至少有一个 openai 兼容提供商已启用且 Key 有效。');
     }
 
-    var ranked = MH.rank(st, cands);
-    var first = ranked[0];
-    var p0 = MH.pOf(st, first.pid);
-
-    // 覆盖 model：客户端随便填，统一用选中的真实模型名
-    var useName = first.name;
-    var outModel = want || MH.publicName(first);
-
-    var up = buildUpstream(p0, first, reqObj, useName);
-    if (up.err) return oaiErr(up.err, 400, 'invalid_request_error');
-
+    var autoRetry = st.cfg.autoRetry !== false;
+    var baseMs = Math.max(300, parseInt(st.cfg.retryBaseMs) || 1500);
+    var capMs = Math.max(2000, (parseFloat(st.cfg.retryMaxMin) || 10) * 60000);
     var t0 = MH.now();
+    var attempts = 0;
+    var tried = {};
 
-    $task.fetch({ url: up.url, method: 'POST', headers: MH.authHeaders(p0), body: up.body }).then(function (r) {
-      var lat = MH.now() - t0;
-      var st2 = MH.load();
-      var m2 = findModel(st2, first.id);
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
 
-      if (r.statusCode < 200 || r.statusCode >= 300) {
-        if (m2) { MH.applyProbe(st2, m2, 'HTTP ' + r.statusCode, lat); }
-        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 失败 HTTP ' + r.statusCode + ' (' + lat + 'ms)');
-        bump(st2, m2);
-        MH.save(st2);
-        return oaiErr(MH.errText(r.statusCode, r.body), r.statusCode, 'upstream_error');
+    function friendly(mapped, text) {
+      var payload = {
+        id: 'mh-gw-' + Math.random().toString(36).slice(2, 10),
+        object: 'chat.completion', created: Math.floor(MH.now() / 1000),
+        model: outModel0 || 'modelhub',
+        choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }],
+        usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+        'x_modelhub': { mapped: mapped }
+      };
+      if (reqObj.stream) sse(payload, outModel0 || 'modelhub'); else json(payload);
+    }
+
+    function giveUp(reason) {
+      var s9 = MH.load();
+      MH.recordUsage(s9, null, {}, { ms: MH.now() - t0, retries: attempts, ok: false });
+      MH.log(s9, '[gw] 放弃：' + reason + '（自动重试 ' + attempts + ' 次，错误未返回 App）');
+      MH.save(s9);
+      friendly('retry_exhausted',
+        '(ModelHub 本地网关) 上游持续失败，已自动重试 ' + attempts + ' 次（含自动换模型），全部错误已在网关层消化。' +
+        '请稍等 1-2 分钟后直接重发消息即可自动续上，无需手动点重试。');
+    }
+
+    function scheduleNext() {
+      var backoff = autoRetry ? Math.min(60000, baseMs * Math.pow(2, Math.min(6, attempts))) : 0;
+      wait(backoff + Math.floor(Math.random() * 300)).then(run);
+    }
+
+    function fetchUp(p0, up, pick, outModel, t1) {
+      var pDone = false;
+      $task.fetch({ url: up.url, method: 'POST', headers: MH.authHeaders(p0), body: up.body }).then(function (r) {
+        if (pDone) return; pDone = true;
+        var lat = MH.now() - t1;
+        var st2 = MH.load();
+        var m2 = findModel(st2, pick.id);
+        if (r.statusCode < 200 || r.statusCode >= 300) {
+          if (m2) MH.applyProbe(st2, m2, 'HTTP ' + r.statusCode, lat);
+          m2.cooldown = MH.now() + Math.min(15000, baseMs * Math.pow(2, Math.min(3, Math.max(0, (m2.fails || 1) - 1))));
+          tried[pick.id] = (tried[pick.id] || 0) + 1;
+          MH.log(st2, '[gw] ' + p0.name + '/' + pick.name + ' HTTP ' + r.statusCode + ' → 自动重试（第 ' + attempts + ' 次，错误不返回 App）');
+          bump(st2, m2); MH.save(st2);
+          scheduleNext();
+        } else {
+          var payload = toOpenAI(p0, r.body, outModel, pick.name);
+          if (!payload) {
+            if (m2) MH.applyProbe(st2, m2, '上游返回无法解析', lat);
+          m2.cooldown = MH.now() + Math.min(15000, baseMs * Math.pow(2, Math.min(3, Math.max(0, (m2.fails || 1) - 1))));
+            tried[pick.id] = (tried[pick.id] || 0) + 1;
+            MH.log(st2, '[gw] ' + p0.name + '/' + pick.name + ' 返回无法解析 → 自动重试');
+            bump(st2, m2); MH.save(st2);
+            scheduleNext();
+            return;
+          }
+          st2 = MH.load(); m2 = findModel(st2, pick.id);
+          var usage = payload.usage || {};
+          MH.recordUsage(st2, pick.id, usage, { ms: MH.now() - t0, retries: Math.max(0, attempts - 1), ok: true });
+          if (m2) { m2.ok = true; m2.err = ''; m2.fails = 0; m2.cooldown = 0; m2.lat = lat; m2.checkedAt = MH.now(); }
+          MH.log(st2, '[gw] → ' + p0.name + '/' + pick.name + ' ' + lat + 'ms · ' + (usage.total_tokens || 0) + 'tk' +
+            ((attempts - 1) > 0 ? ' · 自动重试 ' + (attempts - 1) + ' 次后成功' : ''));
+          bump(st2, m2); MH.save(st2);
+          if (reqObj.stream) sse(payload, outModel); else json(payload);
+        }
+      }, function (e) {
+        if (pDone) return; pDone = true;
+        var st3 = MH.load();
+        var m3 = findModel(st3, pick.id);
+        var msg = (e && e.error) || '网络错误';
+        if (m3) MH.applyProbe(st3, m3, msg, MH.now() - t1);
+          m3.cooldown = MH.now() + Math.min(15000, baseMs * Math.pow(2, Math.min(3, Math.max(0, (m3.fails || 1) - 1))));
+        tried[pick.id] = (tried[pick.id] || 0) + 1;
+        MH.log(st3, '[gw] ' + p0.name + '/' + pick.name + ' 异常 ' + msg + ' → 自动重试');
+        bump(st3, m3); MH.save(st3);
+        scheduleNext();
+      });
+    }
+
+    function run() {
+      if (MH.now() - t0 > capMs) { giveUp('达到最大等待时间'); return; }
+      var s2 = MH.load();
+      var cands = MH.candidates(s2, want);
+      if (!cands.length) {
+        // 全部通道在冷却 → 等到最早解冻再继续（仍然不返回错误）
+        var minCool = 0, i;
+        for (i = 0; i < s2.models.length; i++) {
+          var mm = s2.models[i];
+          if (mm.enabled && mm.cooldown && mm.cooldown > MH.now() && (!minCool || mm.cooldown < minCool)) minCool = mm.cooldown;
+        }
+        var wms = minCool ? Math.min(20000, Math.max(500, minCool - MH.now())) : 2000;
+        if (!autoRetry || MH.now() - t0 + wms > capMs) { giveUp('所有通道冷却中'); return; }
+        wait(wms).then(run);
+        return;
       }
+      var ranked = MH.rank(s2, cands);
+      var pick = null;
+      for (var j = 0; j < ranked.length; j++) if ((tried[ranked[j].id] || 0) < 3) { pick = ranked[j]; break; }
+      if (!pick) pick = ranked[0];
+      attempts++;
+      var p0 = MH.pOf(s2, pick.pid);
+      // overrideModel（默认开）：响应里一律显示真实模型名；客户端填的随便名不外泄
+      var outModel = s2.cfg.overrideModel === false ? (want || MH.publicName(pick)) : MH.publicName(pick);
+      var up = buildUpstream(p0, pick, reqObj, pick.name);
+      if (up.err) { giveUp('请求体无效'); return; }
+      fetchUp(p0, up, pick, outModel, MH.now());
+    }
 
-      var payload = toOpenAI(p0, r.body, outModel, useName);
-      if (!payload) {
-        if (m2) MH.applyProbe(st2, m2, '上游返回无法解析', lat);
-        MH.log(st2, '[gw] ' + p0.name + '/' + useName + ' 返回无法解析');
-        bump(st2, m2);
-        MH.save(st2);
-        return oaiErr('上游返回无法解析', 502, 'upstream_bad_body');
-      }
-
-      // 记一笔 token 用量
-      var tk = (payload.usage && payload.usage.total_tokens) || 0;
-      MH.recordUsage(st2, first.id, payload.usage || {});
-
-      if (m2) { m2.ok = true; m2.err = ''; m2.fails = 0; m2.cooldown = 0; m2.lat = lat; m2.checkedAt = MH.now(); }
-      MH.log(st2, '[gw] → ' + p0.name + '/' + useName + ' ' + lat + 'ms · ' + tk + 'tk');
-      bump(st2, m2);
-      MH.save(st2);
-
-      if (reqObj.stream) return sse(payload, outModel);
-      json(payload);
-    }, function (e) {
-      var st3 = MH.load();
-      var m3 = findModel(st3, first.id);
-      var msg = (e && e.error) || '网络错误';
-      if (m3) MH.applyProbe(st3, m3, msg, MH.now() - t0);
-      MH.log(st3, '[gw] ' + p0.name + '/' + useName + ' 异常: ' + msg);
-      bump(st3, m3);
-      MH.save(st3);
-      oaiErr('上游连接失败：' + msg, 502, 'upstream_unreachable');
-    });
+    run();
     return;
   }
 

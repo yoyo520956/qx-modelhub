@@ -7,7 +7,7 @@ SRC = os.path.join(ROOT, 'src')
 OUT = os.path.join(ROOT, 'out')
 os.makedirs(OUT, exist_ok=True)
 
-VER = '1.2.1'
+VER = '1.2.4'
 
 def rd(n):
     with open(os.path.join(SRC, n), encoding='utf-8') as f:
@@ -18,6 +18,7 @@ ui = rd('ui.html')
 panel = rd('panel.js')
 gw = rd('gateway.js')
 cron = rd('cron.js')
+usage_src = rd('usage.js')
 router = rd('router.js')
 
 ts = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -38,7 +39,8 @@ PRELUDE = (
 )
 
 DISPATCH = r"""
-// ===== 分发：面板 / 模型清单 / 路由 / 定时任务共用一个文件 =====
+// ===== 分发：面板 / 网关 / 定时任务 共用一个文件 =====
+// /v1/ 全部走网关代答（v1.2.4：上游错误永不返回 App，自动重试+自动换模型）
 (function () {
   var u = String((typeof $request !== 'undefined' && $request && $request.url) || '');
   if (!u) { return MH_CRON(); }
@@ -46,9 +48,8 @@ DISPATCH = r"""
   var sl = se >= 0 ? u.indexOf('/', se + 3) : -1;
   var p = sl >= 0 ? u.slice(sl) : '/';
   var qi = p.indexOf('?'); if (qi >= 0) p = p.slice(0, qi);
-  if (p === '/v1/models' || p === '/v1/models/') return MH_MODELS();
   if (/^\/mh(\/|$)/.test(p)) return MH_PANEL();
-  return MH_ROUTER();
+  return MH_GW();
 })();
 """
 
@@ -63,6 +64,8 @@ combined = (
 panel_only = BANNER + PRELUDE + "// ===== 面板 =====\n" + panel + "\n\nMH_PANEL();\n"
 gw_only = BANNER + "var MH_VER_ = " + json.dumps(VER) + ";\n" + "// ===== 公共逻辑 =====\n" + core + "\n\n// ===== 网关 =====\n" + gw + "\n\nMH_GW();\n"
 cron_only = BANNER + "var MH_VER_ = " + json.dumps(VER) + ";\n" + "// ===== 公共逻辑 =====\n" + core + "\n\n// ===== 探活 =====\n" + cron + "\n\nMH_CRON();\n"
+usage_only = BANNER + "var MH_VER_ = " + json.dumps(VER) + ";\n" + "// ===== 公共逻辑 =====\n" + core + "\n\n// ===== 用量日报 =====\n" + usage_src + "\n\nMH_USAGE();\n"
+
 
 def w(name, s):
     p = os.path.join(OUT, name)
@@ -74,4 +77,6 @@ w('modelhub.js', combined)
 w('modelhub-panel.js', panel_only)
 w('modelhub-gw.js', gw_only)
 w('modelhub-cron.js', cron_only)
+w('modelhub-usage.js', usage_only)
+w('modelhub-v124.js', combined)
 print('OK  v' + VER)

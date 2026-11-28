@@ -108,6 +108,26 @@ select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/
   background-repeat:no-repeat;background-position:right 12px center;padding-right:32px}
 .fg{margin-bottom:11px}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* GitHub 风用量仪表盘 */
+.u4{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ucard{background:var(--card2);border:1px solid var(--line2);border-radius:12px;padding:12px}
+.ucard b{font-size:21px;font-weight:700;letter-spacing:-.4px;display:block;line-height:1.15}
+.ucard span{font-size:11px;color:var(--tx3);display:block;margin-top:3px}
+.ucard i{font-style:normal;font-size:11.5px;color:var(--tx2);display:block;margin-top:5px}
+.ucard.hl{background:linear-gradient(135deg,rgba(91,140,255,.16),rgba(61,220,151,.08));border-color:rgba(91,140,255,.35)}
+.ucard.hl b{background:linear-gradient(90deg,#8fb4ff,#3ddc97);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hbars{display:flex;align-items:flex-end;gap:3px;height:64px;padding:6px 2px}
+.hbars div{flex:1;border-radius:2.5px 2.5px 0 0;min-height:2px;background:linear-gradient(180deg,#5b8cff,#3d5fbd);opacity:.92;transition:height .25s}
+.hbars div.z{background:var(--line2);opacity:.5}
+.heat{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,10px);gap:3px;margin:6px 0 2px}
+.heat .c{width:10px;height:10px;border-radius:2.5px;background:var(--line2)}
+.heat .c.l1{background:#0e4429}.heat .c.l2{background:#006d32}.heat .c.l3{background:#26a641}.heat .c.l4{background:#39d353}
+.hnote{display:flex;justify-content:space-between;font-size:10.5px;color:var(--tx3);margin-top:7px}
+.hnote i{display:inline-block;width:10px;height:10px;border-radius:2.5px;vertical-align:-1px;margin-left:3px}
+.clog .row{padding:7px 0;border-bottom:1px solid var(--line)}
+.clog .row:last-child{border-bottom:0}
+.clog .ok{color:var(--ok)}.clog .no{color:var(--bad)}
+.clog .rt{color:var(--warn)}
 .presets{display:flex;gap:7px;flex-wrap:wrap;margin-top:8px}
 .chip{font-size:12px;padding:5px 10px;border-radius:20px;background:var(--card2);
   border:1px solid var(--line2);cursor:pointer;color:var(--tx2);transition:.15s;white-space:nowrap}
@@ -180,6 +200,7 @@ pre.log{font:11.5px/1.55 ui-monospace,Menlo,monospace;color:var(--tx2);margin:0;
   <section id="s-pv"></section>
   <section id="s-md"></section>
   <section id="s-rt"></section>
+  <section id="s-us"></section>
   <section id="s-lg"></section>
 </main>
 <div class="tabs">
@@ -187,6 +208,7 @@ pre.log{font:11.5px/1.55 ui-monospace,Menlo,monospace;color:var(--tx2);margin:0;
   <button data-t="pv"><span class="ic">☁</span>提供商</button>
   <button data-t="md"><span class="ic">▤</span>模型</button>
   <button data-t="rt"><span class="ic">⇄</span>路由</button>
+  <button data-t="us"><span class="ic">▥</span>用量</button>
   <button data-t="lg"><span class="ic">≡</span>日志</button>
 </div>
 <div class="picker" id="picker">
@@ -273,11 +295,12 @@ function render(){
   $('#dot').className = st.healthy>0 ? 'on' : (st.enabled>0?'dead':'');
   $('#sub').textContent = '可用 '+st.healthy+' / 已启用 '+st.enabled+' / 共 '+st.total+
     ' · 最快 '+(st.fastest? st.fastest+' ('+ms(st.fastestMs)+')' : '—');
-  ({ov:renderOv, pv:renderPv, md:renderMd, rt:renderRt, lg:renderLg})[TAB]();
+  ({ov:renderOv, pv:renderPv, md:renderMd, rt:renderRt, us:renderUs, lg:renderLg})[TAB]();
   $('#s-ov').className = TAB==='ov'?'active':'';
   $('#s-pv').className = TAB==='pv'?'active':'';
   $('#s-md').className = TAB==='md'?'active':'';
   $('#s-rt').className = TAB==='rt'?'active':'';
+  $('#s-us').className = TAB==='us'?'active':'';
   $('#s-lg').className = TAB==='lg'?'active':'';
 }
 
@@ -295,6 +318,26 @@ function renderOv(){
     +   '<button class="btn sm" onclick="copyKey()">复制 Key</button>'
     +   '<button class="btn sm ghost" onclick="document.querySelector(\'[data-t=rt]\').click()">路由设置</button>'
     + '</div></div>';
+
+  // 精确接口清单
+  var base = gw.replace(/\/$/,'');
+  html += '<div class="card"><div class="card-h">接口清单（精确端点 · 可逐个复制）</div>';
+  [
+    ['POST', base+'/chat/completions', '对话（OpenAI 兼容 · 自动重试）'],
+    ['GET',  base+'/models',            '模型列表（虚拟池全量）'],
+    ['GET',  base+'/health',            '网关健康'],
+    ['GET',  (base||'https://example.com').replace(/\/v1$/,'')+'/mh/', '面板']
+  ].forEach(function(e){
+    var id = 'ep'+e[0]+'_'+encodeURIComponent(e[1]).replace(/%2F/g,'_').replace(/%/g,'');
+    html += '<div style="padding:8px 0;border-bottom:1px solid var(--line)">'
+      + '<div class="row" style="align-items:center;gap:8px">'
+      + '<span style="font-size:10px;color:var(--ac2);border:1px solid rgba(91,140,255,.4);border-radius:4px;padding:1px 5px;flex:none">'+e[0]+'</span>'
+      + '<span class="mono" style="font-size:11.5px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+h(e[1])+'">'+h(e[1])+'</span>'
+      + '<button class="btn sm ghost" onclick="copyText(document.querySelector(\'#'+id+'\').value)">复制</button></div>'
+      + '<input type="hidden" id="'+id+'" value="'+h(e[1])+'">'
+      + '<div style="font-size:10.5px;color:var(--tx3);margin:3px 0 0 36px">'+e[2]+'</div></div>';
+  });
+  html += '</div>';
 
   html += '<div class="stats">'
     + '<div class="stat"><b style="color:var(--ok)">'+(st.healthy||0)+'</b><span>可用模型</span></div>'
@@ -654,6 +697,16 @@ function renderRt(){
     + '<button class="btn pri" id="btnSaveCfg" style="width:100%;justify-content:center;margin-top:16px">保存</button>'
     + '</div>';
 
+  html += '<div class="card" style="border-color:rgba(61,220,151,.4);background:linear-gradient(180deg,rgba(61,220,151,.07),var(--card))"><div class="card-h" style="color:var(--ok)">永不中断模式</div>'
+    + '<div class="row" style="justify-content:space-between;margin:2px 0 4px">'
+    + '   <div><div style="font-size:13.5px">自动重试 + 自动换模型</div><div style="font-size:11.5px;color:var(--tx3)">上游任何错误（429/5xx/超时/断连）全部在网关层吞掉，绝不返回 App；自动换模型重试到成功</div></div>'
+    + '   <div class="sw'+((c.autoRetry!==false)?' on':'')+'" onclick="this.classList.toggle(\'on\')" id="swRt"></div></div>'
+    + '<div class="fg"><label class="f">失败最长等待（分钟）</label>'
+    + '<div class="row"><input type="number" id="cRMax" min="1" max="60" value="'+(c.retryMaxMin||10)+'" style="width:90px">'
+    + '<span style="font-size:11.5px;color:var(--tx3);margin-top:16px">超时后返回友好提示文本（仍不是错误码），下一条消息自动续上</span></div></div>'
+    + '<button class="btn" id="btnSaveRt" style="width:100%;justify-content:center;margin-top:14px">保存</button>'
+    + '</div>';
+
   html += '<div class="card"><div class="card-h">定时任务·需与上面间隔一致</div>'
     + '<div class="gw" style="padding:12px;margin:0"><div class="url" style="font-size:11.5px" id="cronLine">'+h(cronExpr(c.checkMin||10))+'</div>'
     + '<div class="row" style="margin-top:9px"><button class="btn sm" onclick="copyCron()">复制这一行</button></div></div>'
@@ -685,6 +738,17 @@ function renderRt(){
       toast(d.ok?'已保存':'保存失败', d.ok?'ok':'err'); load();
     });
   });
+  $('#btnSaveRt').addEventListener('click', function(){
+    var b=this; b.classList.add('busy'); b.disabled=true;
+    api('cfg.set', {
+      autoRetry: $('#swRt').classList.contains('on'),
+      retryMaxMin: +$('#cRMax').value||10,
+      retryBaseMs: (S.cfg||{}).retryBaseMs||1500
+    }).then(function(d){
+      b.classList.remove('busy'); b.disabled=false;
+      toast(d.ok?'已保存（永不中断模式生效）':'保存失败', d.ok?'ok':'err'); load();
+    });
+  });
 }
 function cronExpr(min){
   if(min%60===0) return '0 */'+(min/60)+' * * * modelhub-cron.js';
@@ -697,6 +761,118 @@ function genTok(){
   for(var i=0;i<28;i++) s+=c[Math.floor(Math.random()*16)];
   $('#cTok').value=s;
 }
+
+/* ---------- 用量：GitHub 风仪表盘（每5小时/每日/每周/每月/总共）---------- */
+function heatLevel(t){
+  if(!t) return '';
+  if(t<100) return 'l1';
+  if(t<1000) return 'l2';
+  if(t<5000) return 'l3';
+  return 'l4';
+}
+function fmtT(n){
+  n=n||0;
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e4) return (n/1e3).toFixed(1)+'k';
+  return String(n);
+}
+function callFmtT(t){ var d=new Date(t); function p(n){return n<10?'0'+n:n}
+  return p(d.getMonth()+1)+'-'+p(d.getDate())+' '+p(d.getHours())+':'+p(d.getMinutes()); }
+function renderUs(){
+  var u = S.usage || {};
+  var z={t:0,n:0,p:0,c:0};
+  function g(x){ return x||z; }
+  var today=g(u.today), yst=g(u.yesterday), week=g(u.week), weekISO=g(u.weekISO),
+      month=g(u.month), monthCal=g(u.monthCal)||month, total=g(u.total), w5h=g(u.w5h);
+  var html = '';
+  // ① 总览卡片（4 张）
+  html += '<div class="u4" style="margin-bottom:12px">'
+    + '<div class="ucard"><b>'+fmtT(today.t)+'</b><span>今日</span><i>'+today.n+' 次调用</i></div>'
+    + '<div class="ucard"><b>'+fmtT(weekISO.t)+'</b><span>本周（周一起）</span><i>'+weekISO.n+' 次调用</i></div>'
+    + '<div class="ucard"><b>'+fmtT(monthCal.t)+'</b><span>本月</span><i>'+monthCal.n+' 次调用</i></div>'
+    + '<div class="ucard hl"><b>'+fmtT(total.t)+'</b><span>总共（永久累计）</span><i>'+(total.n||0)+' 次调用 · 活跃 '+(u.activeDays||0)+' 天</i></div>'
+    + '</div>';
+  // ② 每 5 小时
+  var by5h = u.by5h || [];
+  var max5 = 0; by5h.forEach(function(x){ if(x.t>max5) max5=x.t; });
+  var b5 = '';
+  by5h.forEach(function(x){
+    var hp = max5 ? Math.max(4, Math.round(x.t/max5*100)) : 4;
+    b5 += '<div title="'+x.t+' tokens · '+x.n+' 次" class="'+(x.t?'':'z')+'" style="height:'+hp+'%"></div>';
+  });
+  html += '<div class="card"><div class="card-h">每 5 小时</div>'
+    + '<div class="stats" style="margin-bottom:8px">'
+    +   '<div class="stat"><b>'+fmtT(w5h.t)+'</b><span>当前 5 小时窗口</span></div>'
+    +   '<div class="stat"><b>'+w5h.n+'</b><span>当前窗口调用</span></div>'
+    +   '<div class="stat"><b>'+fmtT(by5h.reduce(function(a,x){return a+x.t},0))+'</b><span>近 5 天合计</span></div>'
+    + '</div>'
+    + '<div class="hbars">'+b5+'</div>'
+    + '<div class="hnote"><span>← 5 天前</span><span>现在 · 24 个窗口</span></div>'
+    + '</div>';
+  // ③ 热力图（近 105 天，GitHub 风）
+  var grid = u.grid || [];
+  var cells='';
+  grid.forEach(function(x){ cells += '<div class="c '+heatLevel(x.t)+'" title="'+x.d+' · '+(x.t?fmtT(x.t)+' tokens / '+x.n+' 次':'无用量')+'"></div>'; });
+  html += '<div class="card"><div class="card-h">每日贡献（近 105 天 · 永久保留）</div>'
+    + '<div class="heat">'+cells+'</div>'
+    + '<div class="hnote"><span>15 周</span><span>少 <i style="background:var(--line2)"></i><i class="l1"></i><i class="l2"></i><i class="l3"></i><i class="l4"></i> 多</span></div>'
+    + '</div>';
+  // ④ 模型排行
+  if(u.tops && u.tops.length){
+    var mt=0; u.tops.forEach(function(t){ if(t.t>mt) mt=t.t; });
+    html += '<div class="card"><div class="card-h">模型用量 Top</div>';
+    u.tops.forEach(function(t){
+      var hp = mt ? Math.max(3, Math.round(t.t/mt*100)) : 3;
+      html += '<div style="margin:7px 0">'
+        + '<div class="row" style="justify-content:space-between;font-size:12.5px;padding:0">'
+        + '<span class="mono">'+h(t.name)+'</span><span style="color:var(--tx3);font-size:11.5px">'+fmtT(t.t)+' tok · '+t.n+' 次</span></div>'
+        + '<div class="bar" style="margin-top:5px"><i style="width:'+hp+'%"></i></div></div>';
+    });
+    html += '</div>';
+  }
+  // ⑤ 调用流水（最近 15 条；环形保留 500 条，聚合永久）
+  var rc = u.recentCalls || [];
+  if(rc.length){
+    html += '<div class="card clog"><div class="card-h">调用记录（最近 '+rc.length+' 条 · 流水环形 500）</div>';
+    rc.slice(-15).reverse().forEach(function(x){
+      var ms = x.ms ? Math.round(x.ms)+'ms' : '';
+      var rt = x.r ? '<span class="rt">· 自动重试 '+x.r+' 次</span>' : '';
+      html += '<div class="row" style="justify-content:space-between;font-size:12px">'
+        + '<span class="mono" style="color:var(--tx3)">'+callFmtT(x.t)+'</span>'
+        + '<span style="flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+h(x.m||'—')+'</span>'
+        + '<span class="mono" style="font-size:11px">'+(x.ok?'<span class="ok">✓</span> ':'<span class="no">✗</span> ')
+        + x.tok+' tok'+(x.r?' '+rt:'')+' '+(ms?'· '+ms:'')+'</span></div>';
+    });
+    html += '</div>';
+  }
+  // ⑥ 操作
+  html += '<div class="row" style="margin-top:4px">'
+    + '<button class="btn" onclick="copyUsage()" style="flex:1;justify-content:center">复制全量用量报告</button>'
+    + '<button class="btn sm danger" onclick="resetUsage()">清零</button>'
+    + '</div>';
+  $('#s-us').innerHTML = html;
+}
+function usageCopyText(){
+  var u = S.usage || {}, z={t:0,n:0};
+  function g(x){ return x||z; }
+  var today=g(u.today), weekISO=g(u.weekISO), week=g(u.week), monthCal=g(u.monthCal)||g(u.month),
+      total=g(u.total), w5h=g(u.w5h);
+  var L = ['【ModelHub 用量报告】',
+    '每5小时(当前窗口): '+fmtT(w5h.t)+' tokens / '+w5h.n+' 次',
+    '每日(今日): '+fmtT(today.t)+' tokens / '+today.n+' 次',
+    '每周(本周起周一): '+fmtT(weekISO.t)+' tokens / '+weekISO.n+' 次',
+    '每月(本月): '+fmtT(monthCal.t)+' tokens / '+monthCal.n+' 次',
+    '近7天: '+fmtT(week.t)+' tokens / '+week.n+' 次',
+    '总共: '+fmtT(total.t)+' tokens / '+(total.n||0)+' 次 · 活跃 '+(u.activeDays||0)+' 天',
+    '每天明细(近14天):'];
+  (u.byDay||[]).forEach(function(x){ L.push('  '+x.d+': '+(x.t? fmtT(x.t)+' tokens / '+x.n+' 次':'无用量')); });
+  if(u.tops && u.tops.length){
+    L.push('模型 Top:');
+    u.tops.slice(0,6).forEach(function(x){ L.push('  '+x.name+': '+fmtT(x.t)+' tokens / '+x.n+' 次'); });
+  }
+  return L.join('\n');
+}
+function copyUsage(){ copyText(usageCopyText()); }
 
 /* ---------- 日志 ---------- */
 function renderLg(){
@@ -748,8 +924,10 @@ function mockState(){
       {id:'p3::llama-3.3-70b',pid:'p3',pname:'Groq',name:'llama-3.3-70b-versatile',alias:'',enabled:true,ok:false,lat:0,checkedAt:now-300000,hits:5,fails:9,err:'401 Unauthorized',cooldown:now+600000}
     ],
     stats:{total:6,enabled:5,healthy:4,providers:3,fastest:'qwen',fastestMs:366},
-    usage:{today:{p:3120,c:4180,t:7300,n:7},week:{p:41200,c:53100,t:94300,n:96},
-      month:{p:186000,c:241000,t:427000,n:412},total:{p:520000,c:680000,t:1200000,n:1180},
+    usage:{today:{p:3120,c:4180,t:7300,n:7},yesterday:{t:11000,n:20},week:{p:41200,c:53100,t:94300,n:96},weekISO:{t:60000,n:58},
+      month:{p:186000,c:241000,t:427000,n:412},monthCal:{p:186000,c:241000,t:427000,n:412},
+      total:{p:520000,c:680000,t:1200000,n:1180},w5h:{t:1700,n:12},by5h:mockBy5h,grid:mockGrid,
+      activeDays:41,totalCalls:1180,recentCalls:mockCalls,
       byDay:[{d:'11-09',t:21000,n:22},{d:'11-10',t:34000,n:31},{d:'11-11',t:18000,n:19},{d:'11-12',t:52000,n:48},
              {d:'11-13',t:61000,n:55},{d:'11-14',t:28000,n:26},{d:'11-15',t:12000,n:11},{d:'11-16',t:44000,n:40},
              {d:'11-17',t:73000,n:66},{d:'11-18',t:39000,n:35},{d:'11-19',t:25000,n:23},{d:'11-20',t:58000,n:52},
@@ -760,6 +938,9 @@ function mockState(){
     logs:[{t:now-60000,m:'[check] 6 个模型检测完成，4 可用'},{t:now-120000,m:'[route] 选中 p2::Qwen/Qwen3-235B 412ms'},{t:now-300000,m:'[check] p3::llama-3.3-70b 失败：401 Unauthorized'},{t:now-3600000,m:'[init] 面板启动'}]
   };
 }
+var mockBy5h=(function(){var a=[];for(var i=0;i<24;i++){a.push({b:i,t:Math.round(Math.random()*2200),n:Math.round(Math.random()*20)});}return a;})();
+var mockGrid=(function(){var a=[],d=new Date();for(var g=104;g>=0;g--){var dd=new Date(d.getTime()-g*86400000);var key=(dd.getMonth()+1)+'-'+dd.getDate();var r=Math.random();a.push({d:key,t:Math.round(r*r*4000),n:Math.round(r*30)});}return a;})();
+var mockCalls=(function(){var a=[],now=Date.now();for(var i=0;i<15;i++){a.push({t:now-i*4300000,m:['agnes-3.0-flash','gpt-4o-mini','agnes-2.5-pro'][i%3],tok:Math.round(Math.random()*3000),ms:Math.round(Math.random()*4000),r:i%4===0?2:0,ok:i===7?0:1});}return a;})();
 function mockApi(path, body){
   return new Promise(function(res){
     setTimeout(function(){
